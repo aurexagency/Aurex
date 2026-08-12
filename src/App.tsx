@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { RefObject } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Terminal, ArrowRight, ShieldCheck, Code2, Cpu, Zap, Globe, Users, Lock } from 'lucide-react';
+import { Code2, Cpu, Zap, Globe, Users, Lock } from 'lucide-react';
 import FloatingDock from './components/ui/FloatingDock';
 
 gsap.registerPlugin(ScrollTrigger);

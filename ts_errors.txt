@@ -1,0 +1,12 @@
+﻿src/App.tsx(1,1): error TS6133: 'useEffect' is declared but its value is never read.
+src/components/Features.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Features.tsx(4,1): error TS6133: 'ScrollTrigger' is declared but its value is never read.
+src/components/Features.tsx(38,39): error TS6133: 'i' is declared but its value is never read.
+src/components/Features.tsx(74,15): error TS2322: Type '(el: HTMLDivElement | null) => HTMLDivElement | null' is not assignable to type 'Ref<HTMLDivElement> | undefined'.
+  Type '(el: HTMLDivElement | null) => HTMLDivElement | null' is not assignable to type '(instance: HTMLDivElement | null) => void | (() => VoidOrUndefinedOnly)'.
+    Type 'HTMLDivElement | null' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+      Type 'null' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+src/components/Hero.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Incentives.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/Navbar.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/Philosophy.tsx(1,8): error TS6133: 'React' is declared but its value is never read.

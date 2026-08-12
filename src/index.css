@@ -1,0 +1,308 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-brand-black: #000000;
+    --color-brand-gold: #D4AF37;
+    --color-brand-marble: #F2F2F2;
+    --color-brand-anthracite: #1A1A1A;
+    --color-brand-gray: #E0E0E0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Evita che la navbar fissa copra i titoli quando ci si ancora ad essi */
+    scroll-padding-top: 120px; 
+  }
+
+  /* Rispetto delle preferenze di accessibilità di sistema per il motion */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    @apply bg-brand-anthracite text-brand-marble font-sans antialiased overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Noise Overlay */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Hide scrollbar for a cleaner look but keep functionality */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D4AF37;
+}
+
+/* Base Splitting Text Class (prepare for GSAP) */
+.split-line {
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FLOATING DOCK — "The Golden Pulse" Dock Bar
+   ────────────────────────────────────────────────────────────────────────── */
+
+.aurex-floating-dock {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  pointer-events: none;
+  /* Above noise overlay (z-50) but below preloader (z-100) */
+}
+
+.aurex-dock-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px 20px;
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(212, 175, 55, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  pointer-events: auto;
+}
+
+/* ── Gold Indicator ────────────────────────────────────────────────────── */
+.aurex-dock-indicator {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(212, 175, 55, 0.25) 0%,
+    rgba(212, 175, 55, 0.08) 60%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 20px rgba(212, 175, 55, 0.4),
+    0 0 40px rgba(212, 175, 55, 0.15),
+    0 0 60px rgba(212, 175, 55, 0.05);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Glowing ring around the active area */
+.aurex-dock-indicator::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: inset 0 0 8px rgba(212, 175, 55, 0.15);
+}
+
+/* ── Items Container ───────────────────────────────────────────────────── */
+.aurex-dock-items {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.aurex-dock-item {
+  position: relative;
+}
+
+/* ── Button Reset ──────────────────────────────────────────────────────── */
+.aurex-dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 8px 12px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 56px;
+}
+
+.aurex-dock-btn:focus-visible {
+  outline: 2px solid #D4AF37;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* ── Icon Wrapper ──────────────────────────────────────────────────────── */
+.aurex-dock-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  will-change: transform;
+  transition: filter 0.3s ease;
+}
+
+.aurex-dock-icon-wrap svg {
+  color: rgba(242, 242, 242, 0.5);
+  transition: filter 0.3s ease;
+  will-change: color;
+}
+
+/* Active glow on the icon */
+.aurex-dock-btn[aria-current='page'] .aurex-dock-icon-wrap {
+  filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.6));
+}
+
+/* ── Label ─────────────────────────────────────────────────────────────── */
+.aurex-dock-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #D4AF37;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform, opacity;
+  /* Start hidden — GSAP controls these */
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+/* ── Hover shimmer effect on dock shell ────────────────────────────────── */
+.aurex-dock-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(
+    ellipse at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(212, 175, 55, 0.06) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.aurex-dock-shell:hover::before {
+  opacity: 1;
+}
+
+/* ── Responsive: Desktop (wider spacing) ───────────────────────────────── */
+@media (min-width: 768px) {
+  .aurex-dock-shell {
+    padding: 12px 32px 20px;
+  }
+
+  .aurex-dock-items {
+    gap: 16px;
+  }
+
+  .aurex-dock-btn {
+    padding: 8px 16px 0;
+    min-width: 64px;
+  }
+
+  .aurex-dock-label {
+    font-size: 10px;
+  }
+}
+
+/* ── Responsive: Mobile small (tighter) ────────────────────────────────── */
+@media (max-width: 400px) {
+  .aurex-floating-dock {
+    top: 16px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
+  }
+
+  .aurex-dock-shell {
+    padding: 10px 12px 16px;
+    border-radius: 24px;
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .aurex-dock-items {
+    gap: 0;
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .aurex-dock-btn {
+    padding: 8px 4px 0;
+    min-width: 48px;
+  }
+
+  .aurex-dock-label {
+    font-size: 8px;
+  }
+
+  .aurex-dock-indicator {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ── Reduced Motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .aurex-dock-indicator {
+    transition: transform 0.15s ease;
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+  }
+
+  .aurex-dock-icon-wrap {
+    transition: none;
+  }
+
+  .aurex-dock-label {
+    transition: opacity 0.1s ease;
+  }
+}

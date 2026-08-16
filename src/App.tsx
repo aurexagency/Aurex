@@ -610,44 +610,24 @@ function App() {
   const heroSubRef = useRef<HTMLHeadingElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const protocolRef = useRef<HTMLDivElement>(null);
-  const preloaderRef = useRef<HTMLDivElement>(null);
-  const progressBarRef = useRef<HTMLDivElement>(null);
 
-  const [loadPct, setLoadPct] = useState(0);
-  const [allLoaded, setAllLoaded] = useState(false);
   const [reducedMotion] = useState(
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 
-  // ── Animazione barra progresso preloader ──────────────────────────────────
-  useEffect(() => {
-    if (progressBarRef.current) {
-      gsap.to(progressBarRef.current, { width: `${loadPct}%`, duration: 0.3, ease: 'power1.out' });
-    }
-  }, [loadPct]);
+
 
   // ── GSAP centralizzato — unico useEffect, unico mm, ordine deterministico ──
   useEffect(() => {
-    if (!allLoaded) return;
-
-    // ── Fade-out preloader ────────────────────────────────────────────────
-    gsap.to(preloaderRef.current, {
-      opacity: 0,
-      duration: reducedMotion ? 0.1 : 0.8,
-      ease: 'power2.inOut',
-      onComplete: () => {
-        if (preloaderRef.current) preloaderRef.current.style.display = 'none';
-      },
-    });
 
     // ── Hero text intro ───────────────────────────────────────────────────
     gsap.fromTo(heroTitleRef.current,
-      { y: reducedMotion ? 0 : 100, opacity: 0 },
-      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.5, ease: 'power4.out', delay: reducedMotion ? 0 : 0.3 }
+      { y: reducedMotion ? 0 : 60, opacity: 0 },
+      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.1 }
     );
     gsap.fromTo(heroSubRef.current,
-      { y: reducedMotion ? 0 : 100, opacity: 0 },
-      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.5, ease: 'power4.out', delay: reducedMotion ? 0 : 0.5 }
+      { y: reducedMotion ? 0 : 60, opacity: 0 },
+      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.25 }
     );
 
     const mm = gsap.matchMedia();
@@ -716,34 +696,9 @@ function App() {
     return () => {
       mm.revert(); // pulisce TUTTO: canvas ST + navbar + protocol + team
     };
-  }, [allLoaded, reducedMotion]);
+  }, [reducedMotion]);
 
-  // ── Preloading frame — avvia la barra e sblocca il useEffect GSAP ─────────
-  // Separato per non mescolare i cicli di vita: questo effect non conosce GSAP.
-  useEffect(() => {
-    const FRAME_COUNT = 155;
-    const getFrameUrl = (index: number) =>
-      `/animazione_orizzontale/animazione orizzontale _${index.toString().padStart(3, '0')}.jpg`;
-    const imgs: HTMLImageElement[] = [];
-    let loaded = 0;
 
-    const onLoad = () => {
-      loaded += 1;
-      setLoadPct(Math.round((loaded / FRAME_COUNT) * 100));
-      if (loaded === FRAME_COUNT) setAllLoaded(true);
-    };
-
-    for (let i = 0; i < FRAME_COUNT; i++) {
-      const img = new Image();
-      img.src = getFrameUrl(i);
-      img.onload = onLoad;
-      img.onerror = onLoad;
-      imgs.push(img);
-    }
-    // Conserva le immagini già decodificate così setupCanvasSequence
-    // le trova nel src cache del browser senza doppio fetch.
-    (window as any).__aurexFrames = imgs;
-  }, []);
 
   return (
     <div className="relative w-full min-h-screen text-brand-marble bg-brand-anthracite selection:bg-brand-gold selection:text-brand-black">
@@ -752,25 +707,7 @@ function App() {
       {/* FLOATING DOCK NAVIGATION */}
       <FloatingDock />
 
-      {/* PRELOADER LUXURY */}
-      <div
-        ref={preloaderRef}
-        role="status"
-        aria-label="Caricamento Aurex"
-        aria-live="polite"
-        style={{ display: allLoaded ? undefined : 'flex' }}
-        className="fixed inset-0 z-[100] bg-black flex-col items-center justify-center"
-      >
-        <div className="w-full max-w-xs px-8 flex flex-col items-center gap-6">
-          <div className="text-sm font-display font-bold text-brand-gold tracking-[0.4em] uppercase mb-2" aria-hidden="true">Aurex</div>
-          <div className="w-full h-[1px] bg-white/10 relative overflow-hidden rounded-full">
-            <div ref={progressBarRef} className="h-full bg-brand-gold rounded-full" style={{ width: '0%' }} aria-hidden="true" />
-          </div>
-          <span className="font-mono text-[11px] text-brand-gold/60 tracking-widest tabular-nums" aria-label={`Caricamento: ${loadPct}%`}>
-            {String(loadPct).padStart(3, '0')} %
-          </span>
-        </div>
-      </div>
+
 
 
       <main>

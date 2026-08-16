@@ -94,40 +94,59 @@ export default function ProtocolDetail() {
       {/* ── HERO BANNER ────────────────────────────────────────────────────── */}
       <header
         ref={heroRef}
-        className="relative pt-32 pb-20 px-6 lg:px-12 bg-brand-black border-b border-brand-gold/10"
+        className="relative overflow-hidden pt-32 pb-16 md:pt-40 md:pb-24 px-6 lg:px-12 bg-brand-black border-b border-brand-gold/10"
       >
-        <div className="max-w-4xl mx-auto">
-          {/* Back link */}
+        {/* Ultra-subtle watermark number — z-0, non-invasive */}
+        <span
+          className="absolute -top-8 left-1/2 -translate-x-1/2 -z-0 text-[14rem] md:text-[18rem] font-black
+                     text-white/[0.03] select-none pointer-events-none leading-none blur-[1px]"
+          aria-hidden="true"
+        >
+          {step.number}
+        </span>
+
+        <div className="relative z-10 max-w-5xl mx-auto">
+
+          {/* ── Breadcrumb / Back link ─────────────────────────────────────── */}
           <Link
             to="/#protocol"
-            className="inline-flex items-center gap-2 text-sm font-mono text-brand-gold/60 tracking-widest uppercase mb-12
+            className="inline-flex items-center gap-2 text-xs font-mono text-brand-gold/50 tracking-[0.2em] uppercase mb-10
                        hover:text-brand-gold transition-colors duration-300"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Il Protocollo Aurex
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Torna al Protocollo Aurex
           </Link>
 
-          {/* Phase number */}
-          <span
-            className="block text-[8rem] md:text-[12rem] font-serif italic text-brand-gold/10 leading-none select-none -mb-12 md:-mb-20"
-            aria-hidden="true"
-          >
-            {step.number}
-          </span>
+          {/* ── Phase badge (eyebrow) ──────────────────────────────────────── */}
+          <div className="mb-6">
+            <span
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] font-semibold
+                         text-neutral-400 border border-neutral-800 bg-neutral-900/60
+                         px-3 py-1 rounded-full backdrop-blur-md"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-gold/60" aria-hidden="true" />
+              Fase {step.number}
+              <span className="text-neutral-600" aria-hidden="true">//</span>
+              Protocollo Operativo
+            </span>
+          </div>
 
-          {/* Title — H1 SEO */}
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-display uppercase tracking-wide text-brand-marble leading-tight mb-6">
+          {/* ── H1 — clean title, no number prefix ────────────────────────── */}
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight mb-6">
             {step.title}
           </h1>
 
-          {/* Hook */}
+          {/* ── Hook ──────────────────────────────────────────────────────── */}
           <p className="text-lg md:text-xl font-sans text-brand-marble/60 max-w-2xl leading-relaxed">
             {step.hook}
           </p>
         </div>
 
         {/* Bottom gold accent */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-brand-gold/40 to-transparent" aria-hidden="true" />
+        <div
+          className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-brand-gold/40 to-transparent"
+          aria-hidden="true"
+        />
       </header>
 
       {/* ── BODY CONTENT ───────────────────────────────────────────────────── */}

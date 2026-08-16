@@ -25,10 +25,18 @@ const setupCanvasSequence = (
   onProgress?: (pct: number) => void,
   onLoadComplete?: () => void,
 ): (() => void) => {
-  const images: HTMLImageElement[] = [];
+  let images: HTMLImageElement[] = [];
   const imageSeq = { frame: 0 };
   let loadedCount = 0;
   let imagesLoaded = false;  // flag: fetch avviato?
+
+  // ── Riutilizzo frame precaricati (evita re-decode sul main thread) ─────────
+  const cachedFrames = (window as any).__aurexFrames as HTMLImageElement[] | undefined;
+  if (cachedFrames && cachedFrames.length === frameCount) {
+    images = cachedFrames;
+    imagesLoaded = true;
+    loadedCount = frameCount;
+  }
 
   // ── Render Pixel-Perfect — High-DPI / Retina / 4K ────────────────────────
   // Guard clause: se le immagini non sono ancora arrivate, usciamo silenziosamente.
@@ -55,9 +63,8 @@ const setupCanvasSequence = (
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
 
-    // ── 3. Interpolazione ad alta qualità ────────────────────────────────────
+    // ── 3. Interpolazione (smoothing senza quality 'high' per FPS su mobile) ─
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
 
     // ── 4. Cover centrato in coordinate CSS ──────────────────────────────────
     const hRatio = rect.width / img.naturalWidth;
@@ -113,6 +120,7 @@ const setupCanvasSequence = (
         duration: 0.8, ease: 'power2.out',
         transformPerspective: 800, transformOrigin: 'center center',
         overwrite: 'auto',
+        force3D: true,
       });
     };
     onMouseLeave = () => {
@@ -120,6 +128,7 @@ const setupCanvasSequence = (
         rotateY: 0, rotateX: 0, x: 0, y: 0,
         duration: 1.2, ease: 'elastic.out(1, 0.5)',
         overwrite: 'auto',
+        force3D: true,
       });
     };
     hero.addEventListener('mousemove', onMouseMove);
@@ -617,84 +626,89 @@ function App() {
 
 
 
-  // ── GSAP centralizzato — unico useEffect, unico mm, ordine deterministico ──
+  // ── GSAP centralizzato — unico useEffect con gsap.context() ────────────────
   useEffect(() => {
+    const ctx = gsap.context(() => {
 
-    // ── Hero text intro ───────────────────────────────────────────────────
-    gsap.fromTo(heroTitleRef.current,
-      { y: reducedMotion ? 0 : 60, opacity: 0 },
-      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.1 }
-    );
-    gsap.fromTo(heroSubRef.current,
-      { y: reducedMotion ? 0 : 60, opacity: 0 },
-      { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.25 }
-    );
-
-    const mm = gsap.matchMedia();
-
-    // ────────────────────────────────────────────────────────────────────────
-    // CONDIZIONE A: RENDERING STANDARD (motion consentito)
-    // setupCanvasSequence è richiamata QUI, dentro lo stesso mm.add(),
-    // così il suo ScrollTrigger (con pin) viene registrato nello stesso
-    // batch degli altri trigger → GSAP calcola il pinSpacing corretto
-    // prima di posizionare Features/Protocol/Team.
-    // ────────────────────────────────────────────────────────────────────────
-    mm.add('(prefers-reduced-motion: no-preference)', () => {
-      // ── Canvas image sequence (pinning Hero) ─────────────────────────
-      const cleanupHeroCanvas = setupCanvasSequence(
-        canvasRef,
-        heroRef,
-        155,
-        (index) => `/animazione_orizzontale/animazione orizzontale _${index.toString().padStart(3, '0')}.jpg`,
-        '+=5000',
+      // ── Hero text intro ─────────────────────────────────────────────────
+      gsap.fromTo(heroTitleRef.current,
+        { y: reducedMotion ? 0 : 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.1 }
+      );
+      gsap.fromTo(heroSubRef.current,
+        { y: reducedMotion ? 0 : 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.25 }
       );
 
-      // Cleanup del branch: uccide il canvas ST hero e i mouse-listener
-      return () => {
-        cleanupHeroCanvas();
-      };
-    });
+      const mm = gsap.matchMedia();
 
-    // ────────────────────────────────────────────────────────────────────────
-    // CONDIZIONE B: RENDERING RIDOTTA MOBILITÀ (accessibilità)
-    // ────────────────────────────────────────────────────────────────────────
-    mm.add('(prefers-reduced-motion: reduce)', () => {
+      // ──────────────────────────────────────────────────────────────────────
+      // CONDIZIONE A: RENDERING STANDARD (motion consentito)
+      // setupCanvasSequence è richiamata QUI, dentro lo stesso mm.add(),
+      // così il suo ScrollTrigger (con pin) viene registrato nello stesso
+      // batch degli altri trigger → GSAP calcola il pinSpacing corretto
+      // prima di posizionare Features/Protocol/Team.
+      // ──────────────────────────────────────────────────────────────────────
+      mm.add('(prefers-reduced-motion: no-preference)', () => {
+        // ── Canvas image sequence (pinning Hero) ───────────────────────
+        const cleanupHeroCanvas = setupCanvasSequence(
+          canvasRef,
+          heroRef,
+          155,
+          (index) => `/animazione_orizzontale/animazione orizzontale _${index.toString().padStart(3, '0')}.jpg`,
+          '+=5000',
+        );
 
-      // Canvas: solo primo frame statico — nessun pin, nessun tilt
-      const canvas = canvasRef.current;
-      if (canvas) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-      }
-    });
+        // Cleanup del branch: uccide il canvas ST hero e i mouse-listener
+        return () => {
+          cleanupHeroCanvas();
+        };
+      });
 
-    // ── Features stagger — entrambi i branch ─────────────────────────────
-    gsap.fromTo('.feature-card',
-      { y: reducedMotion ? 0 : 100, opacity: 0 },
-      {
-        y: 0, opacity: 1,
-        duration: reducedMotion ? 0.4 : 1,
-        stagger: reducedMotion ? 0 : 0.2,
-        ease: 'power3.out',
-        scrollTrigger: { trigger: featuresRef.current, start: 'top 70%' },
-      }
-    );
+      // ──────────────────────────────────────────────────────────────────────
+      // CONDIZIONE B: RENDERING RIDOTTA MOBILITÀ (accessibilità)
+      // ──────────────────────────────────────────────────────────────────────
+      mm.add('(prefers-reduced-motion: reduce)', () => {
 
-    // ── Team cards ────────────────────────────────────────────────────────
-    gsap.fromTo('.team-card',
-      { y: reducedMotion ? 0 : 80, opacity: 0 },
-      {
-        y: 0, opacity: 1,
-        duration: reducedMotion ? 0.4 : 1.2,
-        stagger: reducedMotion ? 0 : 0.2,
-        ease: 'power3.out',
-        scrollTrigger: { trigger: '#team', start: 'top 75%' },
-      }
-    );
+        // Canvas: solo primo frame statico — nessun pin, nessun tilt
+        const canvas = canvasRef.current;
+        if (canvas) {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        }
+      });
 
-    // ── Cleanup globale ───────────────────────────────────────────────────
+      // ── Features stagger — entrambi i branch ───────────────────────────
+      gsap.fromTo('.feature-card',
+        { y: reducedMotion ? 0 : 100, opacity: 0 },
+        {
+          y: 0, opacity: 1,
+          duration: reducedMotion ? 0.4 : 1,
+          stagger: reducedMotion ? 0 : 0.2,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: featuresRef.current, start: 'top 70%' },
+        }
+      );
+
+      // ── Team cards ──────────────────────────────────────────────────────
+      gsap.fromTo('.team-card',
+        { y: reducedMotion ? 0 : 80, opacity: 0 },
+        {
+          y: 0, opacity: 1,
+          duration: reducedMotion ? 0.4 : 1.2,
+          stagger: reducedMotion ? 0 : 0.2,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: '#team', start: 'top 75%' },
+        }
+      );
+
+    }); // fine gsap.context()
+
+    // ── Cleanup globale ─────────────────────────────────────────────────────
+    // ctx.revert() invoca automaticamente mm.revert() e uccide tutti i
+    // tween/ScrollTrigger creati all'interno del context.
     return () => {
-      mm.revert(); // pulisce TUTTO: canvas ST + navbar + protocol + team
+      ctx.revert();
     };
   }, [reducedMotion]);
 
@@ -716,7 +730,7 @@ function App() {
           ref={heroRef}
           id="hero"
           className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-brand-black"
-          style={{ perspective: '800px' }}
+          style={{ perspective: '800px', willChange: 'transform' }}
         >
           <div className="absolute inset-0 z-0">
             {/* Canvas nativo — la logica è in setupCanvasSequence, richiamata nel mm */}

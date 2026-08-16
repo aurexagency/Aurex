@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Code2, Cpu, Zap, Globe, Users, Lock } from 'lucide-react';
 import FloatingDock from './components/ui/FloatingDock';
+import ProtocolGrid from './components/ProtocolGrid';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -690,6 +691,18 @@ function App() {
         }
       );
 
+      // ── Protocol cards ────────────────────────────────────────────────────
+      gsap.fromTo('.protocol-card',
+        { y: reducedMotion ? 0 : 80, opacity: 0 },
+        {
+          y: 0, opacity: 1,
+          duration: reducedMotion ? 0.4 : 1,
+          stagger: reducedMotion ? 0 : 0.12,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: '#protocol', start: 'top 75%' },
+        }
+      );
+
       // ── Team cards ──────────────────────────────────────────────────────
       gsap.fromTo('.team-card',
         { y: reducedMotion ? 0 : 80, opacity: 0 },
@@ -855,31 +868,16 @@ function App() {
           </h2>
         </section>
 
-        {/* E. Protocol: "Sticky Stacking Workflow" */}
+        {/* E. Protocol: "Il Protocollo Aurex" — 10 Fasi */}
         <section id="protocol" ref={protocolRef} className="py-32 px-6 lg:px-12 relative bg-brand-anthracite">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="text-center mb-24">
-              <h3 className="text-sm font-sans uppercase tracking-[0.3em] text-brand-gold mb-6">Il Protocollo Aurex</h3>
+              <h3 className="text-lg md:text-xl font-sans font-bold uppercase tracking-[0.3em] text-brand-gold mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]">Il Protocollo Aurex</h3>
+              <h2 className="text-4xl md:text-6xl font-display text-[#F2F2F2] max-w-4xl mx-auto">
+                10 Fasi per <span className="font-serif italic text-brand-gold">Dominare il Digitale</span>.
+              </h2>
             </div>
-            <div className="flex flex-col gap-12">
-              {[
-                { n: '01', title: 'Analisi & Coaching', body: 'Formazione metrica e studio approfondito del tuo posizionamento per gettare basi solide.' },
-                { n: '02', title: 'Shooting On-Site', body: 'Produzione cinematografica. Trasformiamo la tua realtà aziendale in arte visiva che emoziona e vende.' },
-                { n: '03', title: 'Editing & SEO', body: 'Ottimizzazione estrema delle performance. Ogni frammento di contenuto è ingegnerizzato per l\'algoritmo.' },
-                { n: '04', title: 'Meta ADS', body: 'Costruiamo la tua community e scaliamo le conversioni con architetture di advertising inarrestabili.' },
-              ].map((step, i) => (
-                <div
-                  key={i}
-                  className="protocol-step group bg-brand-black border border-brand-gold/30 p-12 rounded-lg shadow-2xl h-auto min-h-[30vh] flex flex-col justify-center transition-all duration-500 ease-out cursor-default hover:bg-[linear-gradient(135deg,#1a1a1a_0%,#0d0d0d_100%)] hover:border-brand-gold/60 hover:shadow-[0_0_32px_rgba(212,175,55,0.08)] motion-reduce:transition-none"
-                >
-                  <div className="flex items-center gap-6 mb-6">
-                    <span className="text-4xl font-serif italic text-brand-gold/50 group-hover:text-brand-gold transition-colors duration-500">{step.n}</span>
-                    <h4 className="text-3xl font-display uppercase tracking-widest text-[#F2F2F2]">{step.title}</h4>
-                  </div>
-                  <p className="text-lg font-sans text-[#F2F2F2]/70 group-hover:text-brand-marble/80 transition-colors duration-500">{step.body}</p>
-                </div>
-              ))}
-            </div>
+            <ProtocolGrid />
           </div>
         </section>
 

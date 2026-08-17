@@ -4,7 +4,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Code2, Cpu, Zap, Globe, Users, Lock } from 'lucide-react';
 import FloatingDock from './components/ui/FloatingDock';
-import ProtocolGrid from './components/ProtocolGrid';
+import ProtocolSlider from './components/ProtocolSlider';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -691,18 +691,6 @@ function App() {
         }
       );
 
-      // ── Protocol cards ────────────────────────────────────────────────────
-      gsap.fromTo('.protocol-card',
-        { y: reducedMotion ? 0 : 80, opacity: 0 },
-        {
-          y: 0, opacity: 1,
-          duration: reducedMotion ? 0.4 : 1,
-          stagger: reducedMotion ? 0 : 0.12,
-          ease: 'power3.out',
-          scrollTrigger: { trigger: '#protocol', start: 'top 75%' },
-        }
-      );
-
       // ── Team cards ──────────────────────────────────────────────────────
       gsap.fromTo('.team-card',
         { y: reducedMotion ? 0 : 80, opacity: 0 },
@@ -869,17 +857,9 @@ function App() {
         </section>
 
         {/* E. Protocol: "Il Protocollo Aurex" — 10 Fasi */}
-        <section id="protocol" ref={protocolRef} className="py-32 px-6 lg:px-12 relative bg-brand-anthracite">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-24">
-              <h3 className="text-lg md:text-xl font-sans font-bold uppercase tracking-[0.3em] text-brand-gold mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]">Il Protocollo Aurex</h3>
-              <h2 className="text-4xl md:text-6xl font-display text-[#F2F2F2] max-w-4xl mx-auto">
-                10 Fasi per <span className="font-serif italic text-brand-gold">Dominare il Digitale</span>.
-              </h2>
-            </div>
-            <ProtocolGrid />
-          </div>
-        </section>
+        <div id="protocol" ref={protocolRef}>
+          <ProtocolSlider />
+        </div>
 
         {/* F. Team */}
         <section id="team" aria-labelledby="team-heading" className="py-32 px-6 lg:px-12 bg-brand-anthracite border-t border-brand-gold/10">

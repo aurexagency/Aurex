@@ -12,7 +12,7 @@ gsap.registerPlugin(Flip);
 // ─────────────────────────────────────────────────────────────────────────────
 const TOTAL          = PROTOCOL_DATA.length;   // 10
 const VISIBLE_THUMBS = 4;                      // max miniature nella coda
-const AUTO_DELAY     = 5;                      // secondi per auto-advance
+const AUTO_DELAY     = 8;                      // secondi per auto-advance
 const BULLET_DUR     = 0.9;                    // "proiettile" → fullscreen
 const RECOIL_DUR     = 0.7;                    // "rinculo" coda
 const RECOIL_STAG    = 0.06;                   // stagger fra miniature
@@ -27,7 +27,7 @@ export default function ProtocolSlider() {
   /* ── Refs ──────────────────────────────────────────────────────────────── */
   const containerRef   = useRef<HTMLDivElement>(null);
   const progressRef    = useRef<HTMLDivElement>(null);
-  const bgImageRef     = useRef<HTMLImageElement>(null);
+  const bgVideoRef     = useRef<HTMLVideoElement>(null);
   const flyerRef       = useRef<HTMLImageElement>(null);
   const textBlockRef   = useRef<HTMLDivElement>(null);
   const timerTween     = useRef<gsap.core.Tween | null>(null);
@@ -35,11 +35,30 @@ export default function ProtocolSlider() {
 
   /* ── State ────────────────────────────────────────────────────────────── */
   const [activeIndex, setActiveIndex] = useState(0);
-  const [bgSrc, setBgSrc]            = useState(PROTOCOL_DATA[0].posterUrl);
   const [isPaused, setIsPaused]      = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const activeStep = PROTOCOL_DATA[activeIndex];
+  const videoSrc = isDesktop ? activeStep.videoDesktop : activeStep.videoMobile;
+
+  // Auto-play video on source change
+  useEffect(() => {
+    if (bgVideoRef.current) {
+      bgVideoRef.current.load();
+      bgVideoRef.current.play().catch(() => {});
+    }
+  }, [videoSrc]);
 
   // Detect reduced-motion once
   const prefersReducedMotion =
@@ -58,13 +77,12 @@ export default function ProtocolSlider() {
     for (let i = 1; i <= VISIBLE_THUMBS + 1; i++) {
       const idx = (activeIndex + i) % TOTAL;
       const img = new Image();
-      img.src = PROTOCOL_DATA[idx].posterUrl;
+      img.src = PROTOCOL_DATA[idx].cardImage;
     }
   }, [activeIndex]);
 
   /* ── Initial mount animation ────────────────────────────────────────── */
   useGSAP(() => {
-    // Text fade-up on first load
     if (textBlockRef.current) {
       gsap.fromTo(
         textBlockRef.current.children,
@@ -72,7 +90,6 @@ export default function ProtocolSlider() {
         { y: 0, opacity: 1, stagger: TEXT_STAG, duration: TEXT_ENTER_DUR, ease: 'power4.out', delay: 0.3 }
       );
     }
-    // Queue thumbnails stagger-in
     const thumbs = containerRef.current?.querySelectorAll('[data-queue-thumb]');
     if (thumbs?.length) {
       gsap.fromTo(
@@ -92,36 +109,29 @@ export default function ProtocolSlider() {
       const container = containerRef.current;
       if (!container) {
         setActiveIndex(nextIndex);
-        setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
         isAnimatingRef.current = false;
         return;
       }
 
-      // Kill any ongoing timer
       if (timerTween.current) timerTween.current.kill();
 
       // ── Reduced-motion: simple crossfade ───────────────────────────────
       if (prefersReducedMotion) {
-        gsap.to(bgImageRef.current, {
+        gsap.to(bgVideoRef.current, {
           opacity: 0,
           duration: 0.3,
           onComplete: () => {
-            setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
             setActiveIndex(nextIndex);
-            gsap.to(bgImageRef.current, { opacity: 1, duration: 0.3 });
+            gsap.to(bgVideoRef.current, { opacity: 1, duration: 0.3 });
             isAnimatingRef.current = false;
           },
         });
         return;
       }
 
-      // Direzione per le animazioni enter/leave della coda
-      const isForward =
-        nextIndex > activeIndex ||
-        (activeIndex === TOTAL - 1 && nextIndex === 0);
+      const isForward = nextIndex > activeIndex || (activeIndex === TOTAL - 1 && nextIndex === 0);
 
-      // ── 1. Snapshot coda PRIMA del cambio state ────────────────────────
-      //    Escludi la miniatura clickata (quella che "vola")
+      // 1. Snapshot coda
       const queueThumbs = Array.from(
         container.querySelectorAll('[data-queue-thumb]')
       ).filter((el) => {
@@ -130,7 +140,7 @@ export default function ProtocolSlider() {
       });
       const queueFlipState = Flip.getState(queueThumbs);
 
-      // ── 2. Text exit ───────────────────────────────────────────────────
+      // 2. Text exit
       if (textBlockRef.current) {
         gsap.killTweensOf(textBlockRef.current.children);
         gsap.to(textBlockRef.current.children, {
@@ -142,20 +152,17 @@ export default function ProtocolSlider() {
         });
       }
 
-      // ── 3. Bullet: Flip (miniatura → fullscreen) ──────────────────────
-      const thumbEl = container.querySelector(
-        `[data-queue-index="${nextIndex}"]`
-      ) as HTMLElement | null;
+      // 3. Bullet: Flip (miniatura → fullscreen)
+      const thumbEl = container.querySelector(`[data-queue-index="${nextIndex}"]`) as HTMLElement | null;
       const flyer = flyerRef.current;
       let hasBullet = false;
 
       if (thumbEl && flyer) {
         hasBullet = true;
-        const thumbRect     = thumbEl.getBoundingClientRect();
+        const thumbRect = thumbEl.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
 
-        // Posiziona il flyer esattamente dove sta la miniatura
-        flyer.src = PROTOCOL_DATA[nextIndex].posterUrl;
+        flyer.src = PROTOCOL_DATA[nextIndex].cardImage;
         gsap.set(flyer, {
           position: 'absolute',
           top:  thumbRect.top  - containerRect.top,
@@ -168,10 +175,8 @@ export default function ProtocolSlider() {
           zIndex: 5,
         });
 
-        // Flip.getState → cattura posizione miniatura
         const bulletState = Flip.getState(flyer);
 
-        // Imposta il flyer a fullscreen
         gsap.set(flyer, {
           top: 0,
           left: 0,
@@ -180,18 +185,11 @@ export default function ProtocolSlider() {
           borderRadius: '0px',
         });
 
-        // Flip.from → anima da miniatura a fullscreen
         Flip.from(bulletState, {
           duration: BULLET_DUR,
           ease: 'power3.inOut',
           force3D: true,
           onComplete: () => {
-            // Aggiorna sfondo senza flicker: DOM diretto + state
-            if (bgImageRef.current) {
-              bgImageRef.current.src = PROTOCOL_DATA[nextIndex].posterUrl;
-            }
-            setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
-            // Nascondi flyer dopo che il bg si è aggiornato
             requestAnimationFrame(() => {
               gsap.set(flyer, { visibility: 'hidden', opacity: 0 });
               isAnimatingRef.current = false;
@@ -199,10 +197,8 @@ export default function ProtocolSlider() {
           },
         });
       } else {
-        // ── Fallback (target non in coda, es. navigazione prev) ────────
-        setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
         gsap.fromTo(
-          bgImageRef.current,
+          bgVideoRef.current,
           { opacity: 0.5, scale: 1.06 },
           {
             opacity: 1,
@@ -218,12 +214,11 @@ export default function ProtocolSlider() {
         );
       }
 
-      // ── 4. Commit state (React re-render → coda + testo) ──────────────
+      // 4. Commit state (React re-render → new video starts loading under flyer)
       setActiveIndex(nextIndex);
 
-      // ── 5. Rinculo coda + Text enter (post re-render) ─────────────────
+      // 5. Rinculo coda + Text enter
       requestAnimationFrame(() => {
-        // Rinculo: Flip.from sulle miniature riposizionate
         Flip.from(queueFlipState, {
           duration: RECOIL_DUR,
           ease: 'back.out(1.5)',
@@ -244,7 +239,6 @@ export default function ProtocolSlider() {
             }),
         });
 
-        // Text enter (doppio rAF per garantire il flush di React)
         requestAnimationFrame(() => {
           if (textBlockRef.current) {
             gsap.fromTo(
@@ -266,17 +260,10 @@ export default function ProtocolSlider() {
     [activeIndex, prefersReducedMotion]
   );
 
-  const handleNext = useCallback(
-    () => goTo((activeIndex + 1) % TOTAL),
-    [activeIndex, goTo]
-  );
+  const handleNext = useCallback(() => goTo((activeIndex + 1) % TOTAL), [activeIndex, goTo]);
+  const handlePrev = useCallback(() => goTo(activeIndex === 0 ? TOTAL - 1 : activeIndex - 1), [activeIndex, goTo]);
 
-  const handlePrev = useCallback(
-    () => goTo(activeIndex === 0 ? TOTAL - 1 : activeIndex - 1),
-    [activeIndex, goTo]
-  );
-
-  /* ── Timer (progress bar + autoplay) ─────────────────────────────────── */
+  /* ── Timer ───────────────────────────────────────────────────────────── */
   useGSAP(
     () => {
       if (timerTween.current) timerTween.current.kill();
@@ -324,22 +311,24 @@ export default function ProtocolSlider() {
       role="region"
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
-      {/* ── FULLSCREEN BACKGROUND IMAGE (sfondo statico) ─────────────────── */}
+      {/* ── FULLSCREEN BACKGROUND VIDEO ──────────────────────────────────── */}
       <div className="absolute inset-0 z-0">
-        <img
-          ref={bgImageRef}
-          src={bgSrc}
-          alt=""
-          aria-hidden="true"
+        <video
+          ref={bgVideoRef}
+          src={videoSrc}
+          autoPlay
+          muted
+          loop
+          playsInline
           className="w-full h-full object-cover"
           style={{ willChange: 'transform, opacity' }}
-          draggable={false}
         />
 
-        {/* Gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#000] via-[#000]/75 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#000] via-transparent to-[#000]/30" />
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[#000] to-transparent" />
+        {/* Gradient overlays: Cinematic Radial */}
+        <div 
+          className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-brand-black/40 to-brand-black/90"
+          aria-hidden="true"
+        ></div>
       </div>
 
       {/* ── FLYER (target dell'animazione "proiettile") ───────────────────── */}
@@ -354,7 +343,6 @@ export default function ProtocolSlider() {
           willChange: 'transform',
           zIndex: 5,
         }}
-        draggable={false}
       />
 
       {/* ── MAIN LAYOUT: Content left + Queue right ──────────────────────── */}
@@ -371,7 +359,7 @@ export default function ProtocolSlider() {
                        px-4 py-1.5 rounded-sm backdrop-blur-md mb-8"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse" />
-            PHASE {activeStep.step} // {TOTAL}
+            {activeStep.stepNumber} // {TOTAL}
           </span>
 
           {/* Title H2 */}
@@ -383,9 +371,9 @@ export default function ProtocolSlider() {
             {activeStep.title}
           </h2>
 
-          {/* Tagline */}
+          {/* Tagline / Short Description */}
           <p className="text-lg md:text-xl font-sans text-white/60 leading-relaxed max-w-xl mb-10">
-            {activeStep.tagline}
+            {activeStep.shortDescription}
           </p>
 
           {/* CTA */}
@@ -417,31 +405,29 @@ export default function ProtocolSlider() {
                 onClick={() => goTo(idx)}
                 role="tab"
                 aria-selected={false}
-                aria-label={`Vai alla Fase ${step.step}: ${step.title}`}
-                className="group relative w-[100px] rounded-sm overflow-hidden
-                           border border-white/15 hover:border-[#D4AF37]/60
-                           transition-colors duration-300
-                           bg-[#080808] flex-shrink-0 cursor-pointer"
-                style={{
-                  aspectRatio: '9 / 16',
-                  willChange: 'transform',
-                }}
+                aria-label={`Vai a: ${step.title}`}
+                className="group relative w-36 rounded-sm overflow-hidden flex-shrink-0 cursor-pointer aspect-[9/16]
+                           border border-white/10 hover:border-[#D4AF37]/30 bg-[#080808] transition-all duration-300"
+                style={{ willChange: 'transform' }}
               >
-                {/* Immagine viva — opacità alta, senza filtro nero eccessivo */}
+                {/* Immagine viva */}
                 <img
-                  src={step.posterUrl}
+                  src={step.cardImage}
                   alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-70
-                             group-hover:opacity-90 group-hover:scale-105
-                             transition-all duration-500"
+                  className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-transform duration-500 group-hover:scale-105"
                   draggable={false}
                 />
-                {/* Gradiente sottile solo in basso */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#000]/60 via-transparent to-transparent" />
-                {/* Label: solo "Fase XX" */}
-                <div className="absolute inset-x-0 bottom-0 p-2.5 z-10">
+                
+                {/* Gradiente nero sottile in basso per leggibilità testo */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
+                
+                {/* Label */}
+                <div className="absolute inset-x-0 bottom-0 p-3 z-10 flex flex-col gap-1">
                   <span className="block text-[10px] font-mono text-[#D4AF37] tracking-[0.2em] uppercase">
-                    Fase {step.step}
+                    {step.stepNumber}
+                  </span>
+                  <span className="block text-xs font-sans text-white/90 leading-tight line-clamp-2">
+                    {step.title}
                   </span>
                 </div>
               </button>
@@ -456,36 +442,39 @@ export default function ProtocolSlider() {
           className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory
                      scrollbar-thin scrollbar-thumb-[#D4AF37]/30 scrollbar-track-transparent"
           role="tablist"
-          aria-label="Seleziona una fase del protocollo"
         >
-          {PROTOCOL_DATA.map((step, idx) => (
-            <button
-              key={step.id}
-              onClick={() => goTo(idx)}
-              role="tab"
-              aria-selected={idx === activeIndex}
-              className={`relative shrink-0 w-14 rounded-sm overflow-hidden snap-start
-                         border transition-all duration-200 ${
-                idx === activeIndex
-                  ? 'border-[#D4AF37] ring-1 ring-[#D4AF37]/40'
-                  : 'border-[#D4AF37]/20'
-              }`}
-              style={{ aspectRatio: '9 / 16' }}
-            >
-              <img
-                src={step.posterUrl}
-                alt=""
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity ${
-                  idx === activeIndex ? 'opacity-80' : 'opacity-40'
+          {PROTOCOL_DATA.map((step, idx) => {
+            const isActive = idx === activeIndex;
+            return (
+              <button
+                key={step.id}
+                onClick={() => goTo(idx)}
+                role="tab"
+                aria-selected={isActive}
+                className={`relative shrink-0 w-24 aspect-[9/16] rounded-sm overflow-hidden snap-start
+                           border transition-all duration-300 ${
+                  isActive
+                    ? 'border-[#D4AF37]/60 shadow-[0_0_15px_rgba(212,175,55,0.2)]'
+                    : 'border-white/10 opacity-60'
                 }`}
-                draggable={false}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#000] to-transparent" />
-              <span className="absolute bottom-1 left-1 text-[8px] font-mono text-[#D4AF37]/70">
-                {step.step}
-              </span>
-            </button>
-          ))}
+              >
+                <img
+                  src={step.cardImage}
+                  alt=""
+                  className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 ${
+                    isActive ? 'scale-105 opacity-100' : 'opacity-70'
+                  }`}
+                  draggable={false}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
+                <div className="absolute bottom-2 left-2 right-2 text-left">
+                  <span className="block text-[9px] font-mono text-[#D4AF37] tracking-widest uppercase mb-0.5">
+                    {step.stepNumber}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -494,7 +483,7 @@ export default function ProtocolSlider() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-6">
           {/* Step counter */}
           <span className="text-xs font-mono text-[#D4AF37]/60 tracking-[0.25em] whitespace-nowrap">
-            {activeStep.step} / {TOTAL}
+            {activeStep.stepNumber.replace('FASE ', '')} / {TOTAL}
           </span>
 
           {/* Progress bar */}
@@ -531,13 +520,11 @@ export default function ProtocolSlider() {
       {/* ── SOP MODAL ────────────────────────────────────────────────────── */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-[#000]/92 backdrop-blur-xl cursor-pointer"
             onClick={() => setIsModalOpen(false)}
           />
 
-          {/* Panel */}
           <div
             className="relative z-10 w-full max-w-3xl bg-[#080808] border border-[#D4AF37]/25
                        rounded-sm shadow-2xl shadow-[#D4AF37]/5 flex flex-col max-h-[90vh]"
@@ -546,7 +533,7 @@ export default function ProtocolSlider() {
             <div className="flex items-start justify-between p-6 md:p-8 border-b border-[#D4AF37]/10">
               <div>
                 <span className="text-[11px] font-mono text-[#D4AF37]/60 tracking-[0.25em] uppercase">
-                  PHASE {activeStep.step} // STANDARD OPERATING PROCEDURE
+                  {activeStep.stepNumber} // STANDARD OPERATING PROCEDURE
                 </span>
                 <h3 className="text-2xl md:text-3xl font-display text-white mt-2">
                   {activeStep.title}
@@ -564,7 +551,7 @@ export default function ProtocolSlider() {
             {/* Body */}
             <div className="p-6 md:p-8 overflow-y-auto">
               <p className="text-base md:text-lg text-white/70 leading-relaxed mb-8">
-                {activeStep.description}
+                {activeStep.fullDescription}
               </p>
 
               <h4 className="text-xs font-mono text-[#D4AF37] uppercase tracking-[0.25em] mb-6 pl-4 border-l-2 border-[#D4AF37]">

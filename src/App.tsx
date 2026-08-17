@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { RefObject } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
 import { Code2, Cpu, Zap, Globe, Users, Lock } from 'lucide-react';
 import FloatingDock from './components/ui/FloatingDock';
 import ProtocolSlider from './components/ProtocolSlider';
+import WebServicesShowcase from './components/WebServicesShowcase';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -405,7 +407,12 @@ function DataGrid({ reducedMotion }: { reducedMotion: boolean }) {
       className="h-20 bg-[#0d0d0d] border border-brand-gold/10 flex items-center px-3"
       aria-label="Grafico delle performance in tempo reale"
     >
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-full overflow-visible"
+        aria-hidden="true"
+        style={{ willChange: 'transform, opacity' }}
+      >
         {[0.25, 0.5, 0.75].map((p) => (
           <line key={p} x1={0} y1={H * p} x2={W} y2={H * p} stroke="rgba(212,175,55,0.08)" strokeWidth="1" />
         ))}
@@ -614,6 +621,7 @@ function TeamCard({ member }: { member: TeamMember }) {
 // APP PRINCIPALE
 // ─────────────────────────────────────────────────────────────────────────────
 function App() {
+  const appRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const heroTitleRef = useRef<HTMLHeadingElement>(null);
@@ -625,33 +633,34 @@ function App() {
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 
-
-
-  // ── GSAP centralizzato — unico useEffect con gsap.context() ────────────────
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-
+  // ── GSAP centralizzato — useGSAP() con scope per cleanup React 19 Strict Mode ──
+  // useGSAP crea internamente un gsap.context() con scope su appRef.
+  // Tutti i tween, ScrollTrigger e matchMedia branch creati qui dentro
+  // vengono automaticamente distrutti al re-render/unmount — senza
+  // bisogno di ctx.revert() manuale.
+  useGSAP(
+    () => {
       // ── Hero text intro ─────────────────────────────────────────────────
-      gsap.fromTo(heroTitleRef.current,
+      gsap.fromTo(
+        heroTitleRef.current,
         { y: reducedMotion ? 0 : 60, opacity: 0 },
-        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.1 }
+        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.1, force3D: true }
       );
-      gsap.fromTo(heroSubRef.current,
+      gsap.fromTo(
+        heroSubRef.current,
         { y: reducedMotion ? 0 : 60, opacity: 0 },
-        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.25 }
+        { y: 0, opacity: 1, duration: reducedMotion ? 0.3 : 1.2, ease: 'power4.out', delay: reducedMotion ? 0 : 0.25, force3D: true }
       );
 
+      // ── matchMedia → correttamente ingabbiato nel context useGSAP ──────
       const mm = gsap.matchMedia();
 
-      // ──────────────────────────────────────────────────────────────────────
+      // ────────────────────────────────────────────────────────────────────
       // CONDIZIONE A: RENDERING STANDARD (motion consentito)
-      // setupCanvasSequence è richiamata QUI, dentro lo stesso mm.add(),
-      // così il suo ScrollTrigger (con pin) viene registrato nello stesso
-      // batch degli altri trigger → GSAP calcola il pinSpacing corretto
-      // prima di posizionare Features/Protocol/Team.
-      // ──────────────────────────────────────────────────────────────────────
+      // setupCanvasSequence registra il proprio ScrollTrigger (con pin)
+      // nello stesso batch → GSAP calcola il pinSpacing corretto.
+      // ────────────────────────────────────────────────────────────────────
       mm.add('(prefers-reduced-motion: no-preference)', () => {
-        // ── Canvas image sequence (pinning Hero) ───────────────────────
         const cleanupHeroCanvas = setupCanvasSequence(
           canvasRef,
           heroRef,
@@ -666,12 +675,10 @@ function App() {
         };
       });
 
-      // ──────────────────────────────────────────────────────────────────────
+      // ────────────────────────────────────────────────────────────────────
       // CONDIZIONE B: RENDERING RIDOTTA MOBILITÀ (accessibilità)
-      // ──────────────────────────────────────────────────────────────────────
+      // ────────────────────────────────────────────────────────────────────
       mm.add('(prefers-reduced-motion: reduce)', () => {
-
-        // Canvas: solo primo frame statico — nessun pin, nessun tilt
         const canvas = canvasRef.current;
         if (canvas) {
           canvas.width = window.innerWidth;
@@ -680,43 +687,63 @@ function App() {
       });
 
       // ── Features stagger — entrambi i branch ───────────────────────────
-      gsap.fromTo('.feature-card',
+      gsap.fromTo(
+        '.feature-card',
         { y: reducedMotion ? 0 : 100, opacity: 0 },
         {
-          y: 0, opacity: 1,
+          y: 0,
+          opacity: 1,
           duration: reducedMotion ? 0.4 : 1,
           stagger: reducedMotion ? 0 : 0.2,
           ease: 'power3.out',
+          force3D: true,
           scrollTrigger: { trigger: featuresRef.current, start: 'top 70%' },
         }
       );
 
       // ── Team cards ──────────────────────────────────────────────────────
-      gsap.fromTo('.team-card',
+      gsap.fromTo(
+        '.team-card',
         { y: reducedMotion ? 0 : 80, opacity: 0 },
         {
-          y: 0, opacity: 1,
+          y: 0,
+          opacity: 1,
           duration: reducedMotion ? 0.4 : 1.2,
           stagger: reducedMotion ? 0 : 0.2,
           ease: 'power3.out',
+          force3D: true,
           scrollTrigger: { trigger: '#team', start: 'top 75%' },
         }
       );
 
-    }); // fine gsap.context()
-
-    // ── Cleanup globale ─────────────────────────────────────────────────────
-    // ctx.revert() invoca automaticamente mm.revert() e uccide tutti i
-    // tween/ScrollTrigger creati all'interno del context.
-    return () => {
-      ctx.revert();
-    };
-  }, [reducedMotion]);
+      // ── Web Services Showcase (Bento Cards) ─────────────────────────────
+      gsap.fromTo(
+        '.bento-card',
+        { y: reducedMotion ? 0 : 80, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: reducedMotion ? 0.4 : 1.2,
+          stagger: reducedMotion ? 0 : 0.15,
+          ease: 'power3.out',
+          force3D: true,
+          scrollTrigger: { trigger: '#web-services', start: 'top 70%' },
+        }
+      );
+    },
+    {
+      scope: appRef,
+      dependencies: [reducedMotion],
+    }
+  );
 
 
 
   return (
-    <div className="relative w-full min-h-screen text-brand-marble bg-brand-anthracite selection:bg-brand-gold selection:text-brand-black">
+    <div
+      ref={appRef}
+      className="relative w-full min-h-screen text-brand-marble bg-brand-anthracite selection:bg-brand-gold selection:text-brand-black"
+    >
       <div className="noise-overlay" />
 
       {/* FLOATING DOCK NAVIGATION */}
@@ -738,7 +765,7 @@ function App() {
             <canvas
               ref={canvasRef}
               className="w-full h-full opacity-60 mix-blend-screen"
-              style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+              style={{ transformStyle: 'preserve-3d', willChange: 'transform, opacity' }}
               aria-hidden="true"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-brand-anthracite/30 to-brand-anthracite" />
@@ -815,6 +842,21 @@ function App() {
               </div>
 
             </div>
+          </div>
+        </section>
+
+        {/* C1. Web Engineering Services */}
+        <section id="web-services" className="py-32 px-6 lg:px-12 bg-[#030303] relative z-10 border-t border-brand-gold/10">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-24">
+              <h3 className="service-badge text-sm md:text-base font-mono font-bold uppercase tracking-[0.3em] text-brand-gold mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]">
+                Digital Excellence
+              </h3>
+              <h2 className="text-4xl md:text-6xl lg:text-7xl font-display text-brand-marble max-w-4xl mx-auto leading-tight">
+                Ingegneria Web <span className="font-serif italic text-brand-gold">Su Misura</span>.
+              </h2>
+            </div>
+            <WebServicesShowcase />
           </div>
         </section>
 

@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import gsap from 'gsap';
 import { Flip } from 'gsap/Flip';
 import { useGSAP } from '@gsap/react';
-import { ArrowLeft, ArrowRight, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronRight, X } from 'lucide-react';
 import { PROTOCOL_DATA } from '../data/protocolData';
 
 gsap.registerPlugin(Flip);
@@ -10,27 +10,33 @@ gsap.registerPlugin(Flip);
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
-const TOTAL        = PROTOCOL_DATA.length;       // 10
-const AUTO_DELAY   = 5;                          // seconds per auto-advance
-const BULLET_DUR   = 0.55;                       // "proiettile" → background
-const RECOIL_DUR   = 0.7;                        // "rinculo" miniature
-const RECOIL_STAG  = 0.06;                       // stagger tra miniature
+const TOTAL          = PROTOCOL_DATA.length;   // 10
+const VISIBLE_THUMBS = 4;                      // max miniature nella coda
+const AUTO_DELAY     = 5;                      // secondi per auto-advance
+const BULLET_DUR     = 0.9;                    // "proiettile" → fullscreen
+const RECOIL_DUR     = 0.7;                    // "rinculo" coda
+const RECOIL_STAG    = 0.06;                   // stagger fra miniature
+const TEXT_EXIT_DUR  = 0.3;                    // fade-out testo
+const TEXT_ENTER_DUR = 0.6;                    // fade-in testo
+const TEXT_STAG      = 0.08;                   // stagger elementi di testo
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ProtocolSlider() {
   /* ── Refs ──────────────────────────────────────────────────────────────── */
-  const containerRef  = useRef<HTMLDivElement>(null);
-  const progressRef   = useRef<HTMLDivElement>(null);
-  const thumbRefs     = useRef<(HTMLButtonElement | null)[]>([]);
-  const bgImageRef    = useRef<HTMLImageElement>(null);
-  const textBlockRef  = useRef<HTMLDivElement>(null);
-  const timerTween    = useRef<gsap.core.Tween | null>(null);
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const progressRef    = useRef<HTMLDivElement>(null);
+  const bgImageRef     = useRef<HTMLImageElement>(null);
+  const flyerRef       = useRef<HTMLImageElement>(null);
+  const textBlockRef   = useRef<HTMLDivElement>(null);
+  const timerTween     = useRef<gsap.core.Tween | null>(null);
+  const isAnimatingRef = useRef(false);
 
   /* ── State ────────────────────────────────────────────────────────────── */
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused]       = useState(false);
+  const [bgSrc, setBgSrc]            = useState(PROTOCOL_DATA[0].posterUrl);
+  const [isPaused, setIsPaused]      = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const activeStep = PROTOCOL_DATA[activeIndex];
@@ -41,83 +47,219 @@ export default function ProtocolSlider() {
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
 
+  /* ── Queue: prossimi VISIBLE_THUMBS step dopo l'attivo (circolare) ──── */
+  const queueIndices: number[] = [];
+  for (let i = 1; i <= VISIBLE_THUMBS; i++) {
+    queueIndices.push((activeIndex + i) % TOTAL);
+  }
+
+  /* ── Preload immagini della coda ────────────────────────────────────── */
+  useEffect(() => {
+    for (let i = 1; i <= VISIBLE_THUMBS + 1; i++) {
+      const idx = (activeIndex + i) % TOTAL;
+      const img = new Image();
+      img.src = PROTOCOL_DATA[idx].posterUrl;
+    }
+  }, [activeIndex]);
+
+  /* ── Initial mount animation ────────────────────────────────────────── */
+  useGSAP(() => {
+    // Text fade-up on first load
+    if (textBlockRef.current) {
+      gsap.fromTo(
+        textBlockRef.current.children,
+        { y: 24, opacity: 0 },
+        { y: 0, opacity: 1, stagger: TEXT_STAG, duration: TEXT_ENTER_DUR, ease: 'power4.out', delay: 0.3 }
+      );
+    }
+    // Queue thumbnails stagger-in
+    const thumbs = containerRef.current?.querySelectorAll('[data-queue-thumb]');
+    if (thumbs?.length) {
+      gsap.fromTo(
+        thumbs,
+        { x: 50, opacity: 0, scale: 0.9 },
+        { x: 0, opacity: 1, scale: 1, stagger: 0.1, duration: 0.7, ease: 'back.out(1.5)', delay: 0.5 }
+      );
+    }
+  }, { scope: containerRef });
+
   /* ── Navigate ─────────────────────────────────────────────────────────── */
   const goTo = useCallback(
     (nextIndex: number) => {
-      if (nextIndex === activeIndex) return;
+      if (nextIndex === activeIndex || isAnimatingRef.current) return;
+      isAnimatingRef.current = true;
 
       const container = containerRef.current;
-      if (!container) { setActiveIndex(nextIndex); return; }
-
-      // ── Reduced-motion path: simple crossfade ──────────────────────────
-      if (prefersReducedMotion) {
-        gsap.to(bgImageRef.current, { opacity: 0, duration: 0.3, onComplete: () => {
-          setActiveIndex(nextIndex);
-          gsap.to(bgImageRef.current, { opacity: 1, duration: 0.3 });
-        }});
+      if (!container) {
+        setActiveIndex(nextIndex);
+        setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
+        isAnimatingRef.current = false;
         return;
       }
 
-      // ── 1. Snapshot all thumb positions BEFORE state change ────────────
-      const thumbEls = thumbRefs.current.filter(Boolean) as HTMLButtonElement[];
-      const flipState = Flip.getState(thumbEls);
+      // Kill any ongoing timer
+      if (timerTween.current) timerTween.current.kill();
 
-      // ── 2. Bullet: crossfade background ───────────────────────────────
-      const bgEl = bgImageRef.current;
-      if (bgEl) {
-        // Quick scale-up punch (simulates "impact")
-        gsap.fromTo(bgEl,
-          { scale: 1.08, opacity: 0 },
+      // ── Reduced-motion: simple crossfade ───────────────────────────────
+      if (prefersReducedMotion) {
+        gsap.to(bgImageRef.current, {
+          opacity: 0,
+          duration: 0.3,
+          onComplete: () => {
+            setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
+            setActiveIndex(nextIndex);
+            gsap.to(bgImageRef.current, { opacity: 1, duration: 0.3 });
+            isAnimatingRef.current = false;
+          },
+        });
+        return;
+      }
+
+      // Direzione per le animazioni enter/leave della coda
+      const isForward =
+        nextIndex > activeIndex ||
+        (activeIndex === TOTAL - 1 && nextIndex === 0);
+
+      // ── 1. Snapshot coda PRIMA del cambio state ────────────────────────
+      //    Escludi la miniatura clickata (quella che "vola")
+      const queueThumbs = Array.from(
+        container.querySelectorAll('[data-queue-thumb]')
+      ).filter((el) => {
+        const idx = parseInt(el.getAttribute('data-queue-index') || '-1', 10);
+        return idx !== nextIndex;
+      });
+      const queueFlipState = Flip.getState(queueThumbs);
+
+      // ── 2. Text exit ───────────────────────────────────────────────────
+      if (textBlockRef.current) {
+        gsap.killTweensOf(textBlockRef.current.children);
+        gsap.to(textBlockRef.current.children, {
+          y: -15,
+          opacity: 0,
+          duration: TEXT_EXIT_DUR,
+          stagger: 0.04,
+          ease: 'power2.in',
+        });
+      }
+
+      // ── 3. Bullet: Flip (miniatura → fullscreen) ──────────────────────
+      const thumbEl = container.querySelector(
+        `[data-queue-index="${nextIndex}"]`
+      ) as HTMLElement | null;
+      const flyer = flyerRef.current;
+      let hasBullet = false;
+
+      if (thumbEl && flyer) {
+        hasBullet = true;
+        const thumbRect     = thumbEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+
+        // Posiziona il flyer esattamente dove sta la miniatura
+        flyer.src = PROTOCOL_DATA[nextIndex].posterUrl;
+        gsap.set(flyer, {
+          position: 'absolute',
+          top:  thumbRect.top  - containerRect.top,
+          left: thumbRect.left - containerRect.left,
+          width:  thumbRect.width,
+          height: thumbRect.height,
+          opacity: 1,
+          visibility: 'visible',
+          borderRadius: '4px',
+          zIndex: 5,
+        });
+
+        // Flip.getState → cattura posizione miniatura
+        const bulletState = Flip.getState(flyer);
+
+        // Imposta il flyer a fullscreen
+        gsap.set(flyer, {
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          borderRadius: '0px',
+        });
+
+        // Flip.from → anima da miniatura a fullscreen
+        Flip.from(bulletState, {
+          duration: BULLET_DUR,
+          ease: 'power3.inOut',
+          force3D: true,
+          onComplete: () => {
+            // Aggiorna sfondo senza flicker: DOM diretto + state
+            if (bgImageRef.current) {
+              bgImageRef.current.src = PROTOCOL_DATA[nextIndex].posterUrl;
+            }
+            setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
+            // Nascondi flyer dopo che il bg si è aggiornato
+            requestAnimationFrame(() => {
+              gsap.set(flyer, { visibility: 'hidden', opacity: 0 });
+              isAnimatingRef.current = false;
+            });
+          },
+        });
+      } else {
+        // ── Fallback (target non in coda, es. navigazione prev) ────────
+        setBgSrc(PROTOCOL_DATA[nextIndex].posterUrl);
+        gsap.fromTo(
+          bgImageRef.current,
+          { opacity: 0.5, scale: 1.06 },
           {
-            scale: 1,
             opacity: 1,
-            duration: BULLET_DUR,
+            scale: 1,
+            duration: 0.6,
             ease: 'expo.out',
             force3D: true,
             overwrite: true,
+            onComplete: () => {
+              isAnimatingRef.current = false;
+            },
           }
         );
       }
 
-      // ── 3. Text content punch-in ──────────────────────────────────────
-      if (textBlockRef.current) {
-        gsap.fromTo(
-          textBlockRef.current.children,
-          { y: 24, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.6,
-            stagger: 0.08,
-            ease: 'power4.out',
-            force3D: true,
-            delay: 0.05,
-          }
-        );
-      }
-
-      // ── 4. Commit state (React re-render) ─────────────────────────────
+      // ── 4. Commit state (React re-render → coda + testo) ──────────────
       setActiveIndex(nextIndex);
 
-      // ── 5. Recoil: animate thumbs from old → new positions ────────────
-      // requestAnimationFrame ensures the DOM has updated after setState
+      // ── 5. Rinculo coda + Text enter (post re-render) ─────────────────
       requestAnimationFrame(() => {
-        const newThumbs = thumbRefs.current.filter(Boolean) as HTMLButtonElement[];
-        if (newThumbs.length === 0) return;
-
-        Flip.from(flipState, {
+        // Rinculo: Flip.from sulle miniature riposizionate
+        Flip.from(queueFlipState, {
           duration: RECOIL_DUR,
           ease: 'back.out(1.5)',
           stagger: RECOIL_STAG,
           absolute: true,
           force3D: true,
           onEnter: (elements) =>
-            gsap.fromTo(elements,
-              { opacity: 0, scale: 0.8 },
-              { opacity: 1, scale: 1, duration: RECOIL_DUR, ease: 'back.out(1.5)' }
+            gsap.fromTo(
+              elements,
+              { x: isForward ? 80 : -80, opacity: 0, scale: 0.85 },
+              { x: 0, opacity: 1, scale: 1, duration: RECOIL_DUR, ease: 'back.out(1.5)' }
             ),
           onLeave: (elements) =>
-            gsap.to(elements, { opacity: 0, scale: 0.8, duration: 0.3 }),
+            gsap.to(elements, {
+              x: isForward ? -80 : 80,
+              opacity: 0,
+              duration: 0.3,
+            }),
+        });
+
+        // Text enter (doppio rAF per garantire il flush di React)
+        requestAnimationFrame(() => {
+          if (textBlockRef.current) {
+            gsap.fromTo(
+              textBlockRef.current.children,
+              { y: 20, opacity: 0 },
+              {
+                y: 0,
+                opacity: 1,
+                stagger: TEXT_STAG,
+                duration: TEXT_ENTER_DUR,
+                ease: 'power4.out',
+                delay: hasBullet ? 0.15 : 0,
+              }
+            );
+          }
         });
       });
     },
@@ -134,24 +276,30 @@ export default function ProtocolSlider() {
     [activeIndex, goTo]
   );
 
-  /* ── Timer (progress bar) ─────────────────────────────────────────────── */
-  useGSAP(() => {
-    if (timerTween.current) timerTween.current.kill();
-    if (isModalOpen) return;
+  /* ── Timer (progress bar + autoplay) ─────────────────────────────────── */
+  useGSAP(
+    () => {
+      if (timerTween.current) timerTween.current.kill();
+      if (isModalOpen) return;
 
-    gsap.set(progressRef.current, { scaleX: 0 });
+      gsap.set(progressRef.current, { scaleX: 0 });
 
-    timerTween.current = gsap.to(progressRef.current, {
-      scaleX: 1,
-      duration: AUTO_DELAY,
-      ease: 'none',
-      transformOrigin: 'left center',
-      force3D: true,
-      onComplete: handleNext,
-    });
+      timerTween.current = gsap.to(progressRef.current, {
+        scaleX: 1,
+        duration: AUTO_DELAY,
+        ease: 'none',
+        transformOrigin: 'left center',
+        force3D: true,
+        onComplete: handleNext,
+      });
 
-    if (isPaused) timerTween.current.pause();
-  }, { dependencies: [activeIndex, isPaused, isModalOpen, handleNext], scope: containerRef });
+      if (isPaused) timerTween.current.pause();
+    },
+    {
+      dependencies: [activeIndex, isPaused, isModalOpen, handleNext],
+      scope: containerRef,
+    }
+  );
 
   /* ── Keyboard navigation ──────────────────────────────────────────────── */
   const handleKey = useCallback(
@@ -162,12 +310,9 @@ export default function ProtocolSlider() {
     [handleNext, handlePrev]
   );
 
-  /* ── Build thumb indices (all except active) ──────────────────────────── */
-  const thumbIndices: number[] = [];
-  for (let i = 0; i < TOTAL; i++) {
-    if (i !== activeIndex) thumbIndices.push(i);
-  }
-
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
   return (
     <section
       ref={containerRef}
@@ -179,12 +324,11 @@ export default function ProtocolSlider() {
       role="region"
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
-      {/* ── FULLSCREEN BACKGROUND IMAGE (active step) ────────────────────── */}
+      {/* ── FULLSCREEN BACKGROUND IMAGE (sfondo statico) ─────────────────── */}
       <div className="absolute inset-0 z-0">
         <img
           ref={bgImageRef}
-          key={`bg-${activeStep.id}`}
-          src={activeStep.posterUrl}
+          src={bgSrc}
           alt=""
           aria-hidden="true"
           className="w-full h-full object-cover"
@@ -195,13 +339,26 @@ export default function ProtocolSlider() {
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#000] via-[#000]/75 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#000] via-transparent to-[#000]/30" />
-        {/* Gold vignette at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[#000] to-transparent" />
       </div>
 
-      {/* ── MAIN LAYOUT: Content left + Thumbs right ─────────────────────── */}
-      <div className="relative z-10 h-full max-w-[1440px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row">
+      {/* ── FLYER (target dell'animazione "proiettile") ───────────────────── */}
+      <img
+        ref={flyerRef}
+        alt=""
+        aria-hidden="true"
+        className="absolute object-cover pointer-events-none"
+        style={{
+          visibility: 'hidden',
+          opacity: 0,
+          willChange: 'transform',
+          zIndex: 5,
+        }}
+        draggable={false}
+      />
 
+      {/* ── MAIN LAYOUT: Content left + Queue right ──────────────────────── */}
+      <div className="relative z-10 h-full max-w-[1440px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row">
         {/* LEFT — Text content */}
         <div
           ref={textBlockRef}
@@ -243,49 +400,48 @@ export default function ProtocolSlider() {
           </button>
         </div>
 
-        {/* RIGHT — Vertical thumb strip (9:16 cards) */}
+        {/* RIGHT — Queue: miniature 9:16 (max 4, bottom-aligned) ─────────── */}
         <div
-          className="hidden md:flex items-center gap-3 shrink-0 py-8 md:py-0"
-          aria-label="Seleziona una fase del protocollo"
+          className="hidden md:flex items-end gap-3 pb-24 shrink-0"
           role="tablist"
+          aria-label="Seleziona una fase del protocollo"
         >
-          {thumbIndices.map((idx) => {
+          {queueIndices.map((idx) => {
             const step = PROTOCOL_DATA[idx];
             return (
               <button
                 key={step.id}
-                ref={(el) => { thumbRefs.current[idx] = el; }}
-                data-flip-id={`thumb-${step.id}`}
+                data-queue-thumb=""
+                data-queue-index={idx}
+                data-flip-id={`queue-${step.id}`}
                 onClick={() => goTo(idx)}
                 role="tab"
                 aria-selected={false}
                 aria-label={`Vai alla Fase ${step.step}: ${step.title}`}
-                className="group relative w-[72px] rounded-sm overflow-hidden
-                           border border-[#D4AF37]/20 hover:border-[#D4AF37]/60
+                className="group relative w-[100px] rounded-sm overflow-hidden
+                           border border-white/15 hover:border-[#D4AF37]/60
                            transition-colors duration-300
-                           bg-[#080808] flex-shrink-0"
+                           bg-[#080808] flex-shrink-0 cursor-pointer"
                 style={{
                   aspectRatio: '9 / 16',
                   willChange: 'transform',
                 }}
               >
+                {/* Immagine viva — opacità alta, senza filtro nero eccessivo */}
                 <img
                   src={step.posterUrl}
                   alt=""
-                  className="absolute inset-0 w-full h-full object-cover opacity-40
-                             group-hover:opacity-70 grayscale group-hover:grayscale-0
-                             transition-all duration-300"
+                  className="absolute inset-0 w-full h-full object-cover opacity-70
+                             group-hover:opacity-90 group-hover:scale-105
+                             transition-all duration-500"
                   draggable={false}
                 />
-                {/* Dark overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#000] via-[#000]/30 to-transparent" />
-                {/* Label */}
-                <div className="absolute inset-x-0 bottom-0 p-2 z-10">
-                  <span className="block text-[9px] font-mono text-[#D4AF37]/60 tracking-[0.2em] mb-0.5">
-                    {step.step}
-                  </span>
-                  <span className="block text-[10px] font-display text-white/80 leading-tight line-clamp-2">
-                    {step.title}
+                {/* Gradiente sottile solo in basso */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#000]/60 via-transparent to-transparent" />
+                {/* Label: solo "Fase XX" */}
+                <div className="absolute inset-x-0 bottom-0 p-2.5 z-10">
+                  <span className="block text-[10px] font-mono text-[#D4AF37] tracking-[0.2em] uppercase">
+                    Fase {step.step}
                   </span>
                 </div>
               </button>
@@ -336,7 +492,6 @@ export default function ProtocolSlider() {
       {/* ── BOTTOM BAR: Progress + Controls ──────────────────────────────── */}
       <div className="absolute bottom-0 left-0 right-0 z-30 bg-[#000]/80 backdrop-blur-md border-t border-[#D4AF37]/15">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-6">
-
           {/* Step counter */}
           <span className="text-xs font-mono text-[#D4AF37]/60 tracking-[0.25em] whitespace-nowrap">
             {activeStep.step} / {TOTAL}

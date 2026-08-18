@@ -27,7 +27,7 @@ export default function ProtocolSlider() {
   /* ── Refs ──────────────────────────────────────────────────────────────── */
   const containerRef   = useRef<HTMLDivElement>(null);
   const progressRef    = useRef<HTMLDivElement>(null);
-  const bgVideoRef     = useRef<HTMLVideoElement>(null);
+  const bgMediaRef     = useRef<HTMLDivElement>(null);
   const flyerRef       = useRef<HTMLImageElement>(null);
   const textBlockRef   = useRef<HTMLDivElement>(null);
   const timerTween     = useRef<gsap.core.Tween | null>(null);
@@ -37,7 +37,6 @@ export default function ProtocolSlider() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused]      = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
   );
@@ -50,15 +49,7 @@ export default function ProtocolSlider() {
   }, []);
 
   const activeStep = PROTOCOL_DATA[activeIndex];
-  const videoSrc = isDesktop ? activeStep.videoDesktop : activeStep.videoMobile;
-
-  // Auto-play video on source change
-  useEffect(() => {
-    if (bgVideoRef.current) {
-      bgVideoRef.current.load();
-      bgVideoRef.current.play().catch(() => {});
-    }
-  }, [videoSrc]);
+  const videoSrc = isDesktop ? activeStep.videoDesktop : (activeStep.videoMobile || activeStep.videoDesktop);
 
   // Detect reduced-motion once
   const prefersReducedMotion =
@@ -117,12 +108,12 @@ export default function ProtocolSlider() {
 
       // ── Reduced-motion: simple crossfade ───────────────────────────────
       if (prefersReducedMotion) {
-        gsap.to(bgVideoRef.current, {
+        gsap.to(bgMediaRef.current, {
           opacity: 0,
           duration: 0.3,
           onComplete: () => {
             setActiveIndex(nextIndex);
-            gsap.to(bgVideoRef.current, { opacity: 1, duration: 0.3 });
+            gsap.to(bgMediaRef.current, { opacity: 1, duration: 0.3 });
             isAnimatingRef.current = false;
           },
         });
@@ -198,7 +189,7 @@ export default function ProtocolSlider() {
         });
       } else {
         gsap.fromTo(
-          bgVideoRef.current,
+          bgMediaRef.current,
           { opacity: 0.5, scale: 1.06 },
           {
             opacity: 1,
@@ -311,18 +302,28 @@ export default function ProtocolSlider() {
       role="region"
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
-      {/* ── FULLSCREEN BACKGROUND VIDEO ──────────────────────────────────── */}
+      {/* ── FULLSCREEN BACKGROUND MEDIA ──────────────────────────────────── */}
       <div className="absolute inset-0 z-0">
-        <video
-          ref={bgVideoRef}
-          src={videoSrc}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="w-full h-full object-cover"
-          style={{ willChange: 'transform, opacity' }}
-        />
+        <div ref={bgMediaRef} className="absolute inset-0 w-full h-full" style={{ willChange: 'transform, opacity' }}>
+          {videoSrc ? (
+            <video
+              key={videoSrc}
+              src={videoSrc}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover opacity-80"
+            />
+          ) : (
+            <img
+              key={activeStep.cardImage}
+              src={activeStep.cardImage}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          )}
+        </div>
 
         {/* Gradient overlays: Cinematic Radial */}
         <div 

@@ -23,8 +23,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Definizione del target ideale e della buyer persona.',
       'Calcolo del potenziale di scalabilità del brand.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 1.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 1.webm', // Fallback temporaneo (cartella video mobile vuota)
+    videoDesktop: '/media/protocol/video desktop 3/--1.webm',
+    videoMobile: '', // Fallback temporaneo (cartella video mobile vuota)
     cardImage: '/media/protocol/cards/1_Verticale_.jpeg'
   },
   {
@@ -39,8 +39,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Identificazione dei gap di conversione attuali.',
       'Creazione di una roadmap strategica personalizzata.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 2.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 2.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/2_(verticale_).jpeg'
   },
   {
@@ -55,8 +55,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Allineamento su obiettivi di business condivisi.',
       'Inizio operativo del percorso di crescita.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 3.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 3.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/3_(verticale).jpeg'
   },
   {
@@ -71,8 +71,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Integrazione di sistemi CRM e tracciamento avanzato.',
       'Configurazione di automazioni e sequenze di follow-up.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 4.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 4.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/4_(verticale).jpeg'
   },
   {
@@ -87,8 +87,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Creazione di script dettagliati per shooting video.',
       'Ottimizzazione dei messaggi per la conversione.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 5.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 5.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/5_(verticale).jpeg'
   },
   {
@@ -103,8 +103,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Direzione artistica e gestione del set.',
       'Cattura di asset visivi premium e B-roll.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 6.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 6.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/6_(verticale).jpeg'
   },
   {
@@ -119,8 +119,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Color grading cinematografico in linea col brand.',
       'Sound design e ottimizzazione per piattaforme social.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 7.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 7.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/7_(verticale).jpeg'
   },
   {
@@ -135,8 +135,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Pianificazione e schedulazione multi-canale.',
       'Lancio sincronizzato per massimizzare l\'impatto.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 8.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 8.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/8_(verticale).jpeg'
   },
   {
@@ -151,8 +151,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Attivazione della rete di contatti per initial boost.',
       'Costruzione e moderazione continua della community.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 9.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 9.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/9_(verticale).jpeg'
   },
   {
@@ -167,8 +167,8 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Riunioni di allineamento strategico mensili/settimanali.',
       'Ottimizzazione iterativa per scalare il ROI.'
     ],
-    videoDesktop: '/media/protocol/video desktop 2/orizontale 10.webm',
-    videoMobile: '/media/protocol/video desktop 2/orizontale 10.webm',
+    videoDesktop: '',
+    videoMobile: '',
     cardImage: '/media/protocol/cards/10_(verticale).jpeg'
   }
 ];

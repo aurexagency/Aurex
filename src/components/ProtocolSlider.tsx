@@ -13,12 +13,27 @@ gsap.registerPlugin(Flip);
 const TOTAL          = PROTOCOL_DATA.length;   // 10
 const VISIBLE_THUMBS = 4;                      // max miniature nella coda
 const AUTO_DELAY     = 8;                      // secondi per auto-advance
-const BULLET_DUR     = 0.9;                    // "proiettile" → fullscreen
+const BULLET_DUR     = 0.9;                    // "proiettile" → fullscreen (Flip)
+const REVEAL_DUR     = 0.6;                    // dissolvenza scudo → video
 const RECOIL_DUR     = 0.7;                    // "rinculo" coda
 const RECOIL_STAG    = 0.06;                   // stagger fra miniature
 const TEXT_EXIT_DUR  = 0.3;                    // fade-out testo
 const TEXT_ENTER_DUR = 0.6;                    // fade-in testo
 const TEXT_STAG      = 0.08;                   // stagger elementi di testo
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GPU-ACCELERATED VIDEO STYLES
+// ─────────────────────────────────────────────────────────────────────────────
+// Stili per il <video> unico. Forziamo il compositing GPU con translateZ(0)
+// e will-change. Nessun filtro CSS direttamente sul video.
+const VIDEO_GPU_STYLES: React.CSSProperties = {
+  willChange: 'transform, opacity',
+  transform: 'translateZ(0)',
+  backfaceVisibility: 'hidden',
+  WebkitBackfaceVisibility: 'hidden',
+  imageRendering: 'auto',
+  objectFit: 'cover',
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
@@ -27,11 +42,22 @@ export default function ProtocolSlider() {
   /* ── Refs ──────────────────────────────────────────────────────────────── */
   const containerRef   = useRef<HTMLDivElement>(null);
   const progressRef    = useRef<HTMLDivElement>(null);
-  const bgMediaRef     = useRef<HTMLDivElement>(null);
-  const flyerRef       = useRef<HTMLImageElement>(null);
   const textBlockRef   = useRef<HTMLDivElement>(null);
   const timerTween     = useRef<gsap.core.Tween | null>(null);
   const isAnimatingRef = useRef(false);
+
+  // ── SINGLE VIDEO: unico tag <video> per il background ──────────────────
+  // Il src viene aggiornato a runtime, ma è coperto dallo "scudo visivo"
+  // (l'immagine orizzontale) durante il caricamento.
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // ── SHIELD (scudo visivo): immagine fullscreen sovrapposta al video ────
+  // Viene Flip-animata dalla miniatura a fullscreen con GSAP, poi sfumata
+  // a opacity 0 solo quando `canplay` conferma che il video è decodificato.
+  const shieldRef = useRef<HTMLImageElement>(null);
+
+  // Listener `canplay` cleanup ref — per evitare listener orfani
+  const canplayCleanupRef = useRef<(() => void) | null>(null);
 
   /* ── State ────────────────────────────────────────────────────────────── */
   const [activeIndex, setActiveIndex] = useState(0);
@@ -49,7 +75,6 @@ export default function ProtocolSlider() {
   }, []);
 
   const activeStep = PROTOCOL_DATA[activeIndex];
-  const videoSrc = isDesktop ? activeStep.videoDesktop : (activeStep.videoMobile || activeStep.videoDesktop);
 
   // Detect reduced-motion once
   const prefersReducedMotion =
@@ -63,14 +88,40 @@ export default function ProtocolSlider() {
     queueIndices.push((activeIndex + i) % TOTAL);
   }
 
-  /* ── Preload immagini della coda ────────────────────────────────────── */
+  /* ── Preload: immagini della coda + cover orizzontali ────────────────── */
   useEffect(() => {
     for (let i = 1; i <= VISIBLE_THUMBS + 1; i++) {
       const idx = (activeIndex + i) % TOTAL;
-      const img = new Image();
-      img.src = PROTOCOL_DATA[idx].cardImage;
+      const step = PROTOCOL_DATA[idx];
+      // Preload sia la card verticale sia la cover orizzontale
+      new Image().src = step.cardImage;
+      new Image().src = step.coverImage;
     }
   }, [activeIndex]);
+
+  /* ══════════════════════════════════════════════════════════════════════════
+   * MOUNT: inizializza il video di background con il primo step
+   * ════════════════════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.src = getVideoSrc(0);
+      video.load();
+      video.play().catch(() => {});
+    }
+    // Solo al mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup del listener canplay al unmount
+  useEffect(() => {
+    return () => {
+      if (canplayCleanupRef.current) {
+        canplayCleanupRef.current();
+        canplayCleanupRef.current = null;
+      }
+    };
+  }, []);
 
   /* ── Initial mount animation ────────────────────────────────────────── */
   useGSAP(() => {
@@ -91,6 +142,98 @@ export default function ProtocolSlider() {
     }
   }, { scope: containerRef });
 
+  /* ══════════════════════════════════════════════════════════════════════════
+   * performTransition — Core della strategia "Image-to-Video Cover"
+   *
+   * Flusso:
+   *  1. GSAP Flip espande l'immagine dello scudo dalla miniatura a fullscreen
+   *  2. Sotto lo scudo, cambiamo `video.src` al nuovo step
+   *  3. Ascoltiamo l'evento nativo `canplay` sul <video>
+   *  4. Solo quando canplay è emesso, sfumiamo lo scudo (opacity 1→0)
+   *  5. Il video è già in play sotto lo scudo → reveal perfetto, zero black frame
+   *
+   * Lo scudo usa l'immagine `coverImage` (orizzontale 16:9 .webp) che è
+   * nativamente uguale al primo frame del video → transizione impercettibile.
+   *
+   * Il `videoRef` è gestito come ref singolo React. Il listener `canplay` è
+   * registrato come evento DOM nativo e pulito ad ogni nuova transizione
+   * (via canplayCleanupRef) per evitare listener duplicati.
+   * ════════════════════════════════════════════════════════════════════════ */
+  const performTransition = useCallback(
+    (nextIndex: number) => {
+      const video  = videoRef.current;
+      const shield = shieldRef.current;
+      if (!video || !shield) return;
+
+      // Pulisci eventuali listener canplay precedenti non ancora scattati
+      if (canplayCleanupRef.current) {
+        canplayCleanupRef.current();
+        canplayCleanupRef.current = null;
+      }
+
+      const nextStep = PROTOCOL_DATA[nextIndex];
+
+      // ── 1. Posiziona lo scudo come fullscreen cover ─────────────────────
+      shield.src = nextStep.coverImage;
+      gsap.set(shield, {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        opacity: 1,
+        visibility: 'visible',
+        borderRadius: '0px',
+        zIndex: 4, // sopra il video (z-0), sotto l'overlay testo (z-10)
+      });
+
+      // ── 2. Sotto lo scudo: cambia src del video ─────────────────────────
+      const newSrc = getVideoSrc(nextIndex);
+      video.src = newSrc;
+      video.load();
+
+      // ── 3. Sincronizzazione DOM nativa: attendi che il primo frame
+      //       sia decodificato prima di rivelare il video ──────────────────
+      const onCanPlay = () => {
+        video.removeEventListener('canplay', onCanPlay);
+        canplayCleanupRef.current = null;
+
+        // Assicurati che il video stia effettivamente girando
+        video.play().catch(() => {});
+
+        // ── 4. THE REVEAL: sfuma lo scudo, mostrando il video sotto ──────
+        gsap.to(shield, {
+          opacity: 0,
+          duration: REVEAL_DUR,
+          ease: 'power2.inOut',
+          force3D: true,
+          onComplete: () => {
+            gsap.set(shield, { visibility: 'hidden' });
+            isAnimatingRef.current = false;
+          },
+        });
+      };
+
+      video.addEventListener('canplay', onCanPlay);
+      canplayCleanupRef.current = () => video.removeEventListener('canplay', onCanPlay);
+
+      // Fallback: se canplay non scatta entro 3s (rete lenta), forza il reveal
+      const fallbackTimer = gsap.delayedCall(3, () => {
+        if (canplayCleanupRef.current) {
+          onCanPlay(); // forza il reveal
+        }
+      });
+
+      // Pulisci il fallback se canplay scatta prima
+      const originalCleanup = canplayCleanupRef.current;
+      canplayCleanupRef.current = () => {
+        originalCleanup();
+        fallbackTimer.kill();
+      };
+    },
+    [getVideoSrc]
+  );
+
   /* ── Navigate ─────────────────────────────────────────────────────────── */
   const goTo = useCallback(
     (nextIndex: number) => {
@@ -106,23 +249,14 @@ export default function ProtocolSlider() {
 
       if (timerTween.current) timerTween.current.kill();
 
-      // ── Reduced-motion: simple crossfade ───────────────────────────────
+      // ── Reduced-motion: salta GSAP Flip, swap istantaneo ───────────────
       if (prefersReducedMotion) {
-        gsap.to(bgMediaRef.current, {
-          opacity: 0,
-          duration: 0.3,
-          onComplete: () => {
-            setActiveIndex(nextIndex);
-            gsap.to(bgMediaRef.current, { opacity: 1, duration: 0.3 });
-            isAnimatingRef.current = false;
-          },
-        });
         return;
       }
 
       const isForward = nextIndex > activeIndex || (activeIndex === TOTAL - 1 && nextIndex === 0);
 
-      // 1. Snapshot coda
+      // 1. Snapshot coda per Flip
       const queueThumbs = Array.from(
         container.querySelectorAll('[data-queue-thumb]')
       ).filter((el) => {
@@ -143,18 +277,22 @@ export default function ProtocolSlider() {
         });
       }
 
-      // 3. Bullet: Flip (miniatura → fullscreen)
+      // 3. GSAP Flip: miniatura → scudo fullscreen ────────────────────────
+      //    L'immagine nella thumbnail usa object-cover con aspect 9:16 ma
+      //    la sorgente è 16:9. Lo scudo (coverImage) è la stessa scena in
+      //    orizzontale → visivamente coerente durante il Flip.
       const thumbEl = container.querySelector(`[data-queue-index="${nextIndex}"]`) as HTMLElement | null;
-      const flyer = flyerRef.current;
+      const shield  = shieldRef.current;
       let hasBullet = false;
 
-      if (thumbEl && flyer) {
+      if (thumbEl && shield) {
         hasBullet = true;
-        const thumbRect = thumbEl.getBoundingClientRect();
+        const thumbRect     = thumbEl.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
 
-        flyer.src = PROTOCOL_DATA[nextIndex].cardImage;
-        gsap.set(flyer, {
+        // Imposta lo scudo nella posizione della miniatura
+        shield.src = PROTOCOL_DATA[nextIndex].coverImage;
+        gsap.set(shield, {
           position: 'absolute',
           top:  thumbRect.top  - containerRect.top,
           left: thumbRect.left - containerRect.left,
@@ -163,12 +301,14 @@ export default function ProtocolSlider() {
           opacity: 1,
           visibility: 'visible',
           borderRadius: '4px',
-          zIndex: 5,
+          zIndex: 4,
         });
 
-        const bulletState = Flip.getState(flyer);
+        // Cattura stato iniziale per Flip
+        const bulletState = Flip.getState(shield);
 
-        gsap.set(flyer, {
+        // Imposta stato finale: fullscreen
+        gsap.set(shield, {
           top: 0,
           left: 0,
           width: '100%',
@@ -176,36 +316,20 @@ export default function ProtocolSlider() {
           borderRadius: '0px',
         });
 
+        // Anima il Flip
         Flip.from(bulletState, {
           duration: BULLET_DUR,
           ease: 'power3.inOut',
           force3D: true,
           onComplete: () => {
-            requestAnimationFrame(() => {
-              gsap.set(flyer, { visibility: 'hidden', opacity: 0 });
-              isAnimatingRef.current = false;
-            });
+            // Lo scudo è ora fullscreen → avvia il caricamento del video sotto
+            performTransition(nextIndex);
           },
         });
       } else {
-        gsap.fromTo(
-          bgMediaRef.current,
-          { opacity: 0.5, scale: 1.06 },
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 0.6,
-            ease: 'expo.out',
-            force3D: true,
-            overwrite: true,
-            onComplete: () => {
-              isAnimatingRef.current = false;
-            },
-          }
-        );
       }
 
-      // 4. Commit state (React re-render → new video starts loading under flyer)
+      // 4. Commit state → React re-render (testi, coda)
       setActiveIndex(nextIndex);
 
       // 5. Rinculo coda + Text enter
@@ -248,7 +372,7 @@ export default function ProtocolSlider() {
         });
       });
     },
-    [activeIndex, prefersReducedMotion]
+    [activeIndex, prefersReducedMotion, performTransition]
   );
 
   const handleNext = useCallback(() => goTo((activeIndex + 1) % TOTAL), [activeIndex, goTo]);
@@ -302,47 +426,41 @@ export default function ProtocolSlider() {
       role="region"
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
-      {/* ── FULLSCREEN BACKGROUND MEDIA ──────────────────────────────────── */}
-      <div className="absolute inset-0 z-0">
-        <div ref={bgMediaRef} className="absolute inset-0 w-full h-full" style={{ willChange: 'transform, opacity' }}>
-          {videoSrc ? (
-            <video
-              key={videoSrc}
-              src={videoSrc}
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover opacity-80"
-            />
-          ) : (
-            <img
-              key={activeStep.cardImage}
-              src={activeStep.cardImage}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          )}
-        </div>
 
-        {/* Gradient overlays: Cinematic Radial */}
-        <div 
-          className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-brand-black/40 to-brand-black/90"
-          aria-hidden="true"
-        ></div>
+        {/* ── OVERLAY: effetti visivi separati dal video ───────────────────
+         *  Gradiente, brightness, vignette vanno QUI — mai sul <video>.
+         * ──────────────────────────────────────────────────────────────── */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.35) 100%)',
+          }}
+        />
       </div>
 
-      {/* ── FLYER (target dell'animazione "proiettile") ───────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+       *  SHIELD (Scudo Visivo) — <img> con coverImage orizzontale 16:9.
+       *
+       *  Ciclo di vita:
+       *   1. Parte hidden (visibility:hidden, opacity:0)
+       *   2. Quando l'utente clicca una thumbnail, GSAP Flip la espande
+       *      dalla posizione della miniatura a fullscreen (z-index 4)
+       *   3. Sotto lo scudo, il video carica il nuovo src
+       *   4. Al `canplay` del video, lo scudo sfuma (opacity 1→0)
+       *   5. Torna hidden, pronto per la prossima transizione
+       * ═══════════════════════════════════════════════════════════════════ */}
       <img
-        ref={flyerRef}
+        ref={shieldRef}
         alt=""
         aria-hidden="true"
         className="absolute object-cover pointer-events-none"
         style={{
           visibility: 'hidden',
           opacity: 0,
-          willChange: 'transform',
-          zIndex: 5,
+          willChange: 'transform, opacity',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          zIndex: 4,
         }}
       />
 
@@ -389,9 +507,10 @@ export default function ProtocolSlider() {
           </button>
         </div>
 
-        {/* RIGHT — Queue: miniature 9:16 (max 4, bottom-aligned) ─────────── */}
+        {/* RIGHT — Queue: miniature 9:16 (max 4, bottom-aligned)
+         *  Spaziatura: gap-4 (16px = 2×8) e pb-24 (96px = 12×8) → griglia 8px */}
         <div
-          className="hidden md:flex items-end gap-3 pb-24 shrink-0"
+          className="hidden md:flex items-end gap-4 pb-24 shrink-0"
           role="tablist"
           aria-label="Seleziona una fase del protocollo"
         >
@@ -407,11 +526,11 @@ export default function ProtocolSlider() {
                 role="tab"
                 aria-selected={false}
                 aria-label={`Vai a: ${step.title}`}
-                className="group relative w-36 rounded-sm overflow-hidden flex-shrink-0 cursor-pointer aspect-[9/16]
+                className="group relative w-[136px] rounded-sm overflow-hidden flex-shrink-0 cursor-pointer aspect-[9/16]
                            border border-white/10 hover:border-[#D4AF37]/30 bg-[#080808] transition-all duration-300"
                 style={{ willChange: 'transform' }}
               >
-                {/* Immagine viva */}
+                {/* Immagine viva — usa la card verticale per il thumbnail */}
                 <img
                   src={step.cardImage}
                   alt=""
@@ -422,7 +541,7 @@ export default function ProtocolSlider() {
                 {/* Gradiente nero sottile in basso per leggibilità testo */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
                 
-                {/* Label */}
+                {/* Label — padding p-3 (12px) ≈ 1.5×8 arrotondato */}
                 <div className="absolute inset-x-0 bottom-0 p-3 z-10 flex flex-col gap-1">
                   <span className="block text-[10px] font-mono text-[#D4AF37] tracking-[0.2em] uppercase">
                     {step.stepNumber}
@@ -496,7 +615,7 @@ export default function ProtocolSlider() {
             />
           </div>
 
-          {/* Nav arrows */}
+          {/* Nav arrows — gap-2 (8px) → griglia 8px */}
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrev}
@@ -530,7 +649,7 @@ export default function ProtocolSlider() {
             className="relative z-10 w-full max-w-3xl bg-[#080808] border border-[#D4AF37]/25
                        rounded-sm shadow-2xl shadow-[#D4AF37]/5 flex flex-col max-h-[90vh]"
           >
-            {/* Header */}
+            {/* Header — padding p-8 (32px = 4×8) → griglia 8px */}
             <div className="flex items-start justify-between p-6 md:p-8 border-b border-[#D4AF37]/10">
               <div>
                 <span className="text-[11px] font-mono text-[#D4AF37]/60 tracking-[0.25em] uppercase">
@@ -549,7 +668,7 @@ export default function ProtocolSlider() {
               </button>
             </div>
 
-            {/* Body */}
+            {/* Body — padding p-8 (32px = 4×8), mb-8 (32px), space-y gap 12px → griglia 8px */}
             <div className="p-6 md:p-8 overflow-y-auto">
               <p className="text-base md:text-lg text-white/70 leading-relaxed mb-8">
                 {activeStep.fullDescription}

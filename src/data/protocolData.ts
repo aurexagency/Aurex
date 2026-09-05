@@ -8,6 +8,8 @@ export interface ProtocolStep {
   videoDesktop: string;
   videoMobile: string;
   cardImage: string;
+  /** Immagine orizzontale 16:9 hi-res usata come "scudo" durante il GSAP Flip */
+  coverImage: string;
 }
 
 export const PROTOCOL_DATA: ProtocolStep[] = [
@@ -23,9 +25,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Definizione del target ideale e della buyer persona.',
       'Calcolo del potenziale di scalabilità del brand.'
     ],
-    videoDesktop: '/media/protocol/video desktop 3/--1.webm',
-    videoMobile: '', // Fallback temporaneo (cartella video mobile vuota)
-    cardImage: '/media/protocol/cards/1_Verticale_.jpeg'
   },
   {
     id: 2,
@@ -39,9 +38,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Identificazione dei gap di conversione attuali.',
       'Creazione di una roadmap strategica personalizzata.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/2_(verticale_).jpeg'
   },
   {
     id: 3,
@@ -55,9 +51,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Allineamento su obiettivi di business condivisi.',
       'Inizio operativo del percorso di crescita.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/3_(verticale).jpeg'
   },
   {
     id: 4,
@@ -71,9 +64,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Integrazione di sistemi CRM e tracciamento avanzato.',
       'Configurazione di automazioni e sequenze di follow-up.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/4_(verticale).jpeg'
   },
   {
     id: 5,
@@ -87,9 +77,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Creazione di script dettagliati per shooting video.',
       'Ottimizzazione dei messaggi per la conversione.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/5_(verticale).jpeg'
   },
   {
     id: 6,
@@ -103,9 +90,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Direzione artistica e gestione del set.',
       'Cattura di asset visivi premium e B-roll.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/6_(verticale).jpeg'
   },
   {
     id: 7,
@@ -119,9 +103,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Color grading cinematografico in linea col brand.',
       'Sound design e ottimizzazione per piattaforme social.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/7_(verticale).jpeg'
   },
   {
     id: 8,
@@ -135,9 +116,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Pianificazione e schedulazione multi-canale.',
       'Lancio sincronizzato per massimizzare l\'impatto.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/8_(verticale).jpeg'
   },
   {
     id: 9,
@@ -151,9 +129,6 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Attivazione della rete di contatti per initial boost.',
       'Costruzione e moderazione continua della community.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/9_(verticale).jpeg'
   },
   {
     id: 10,
@@ -167,8 +142,5 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
       'Riunioni di allineamento strategico mensili/settimanali.',
       'Ottimizzazione iterativa per scalare il ROI.'
     ],
-    videoDesktop: '',
-    videoMobile: '',
-    cardImage: '/media/protocol/cards/10_(verticale).jpeg'
   }
 ];

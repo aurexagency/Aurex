@@ -63,6 +63,7 @@ export default function ProtocolSlider() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused]      = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
   );
@@ -75,6 +76,15 @@ export default function ProtocolSlider() {
   }, []);
 
   const activeStep = PROTOCOL_DATA[activeIndex];
+
+  /** Calcola il src video corretto per un dato indice */
+  const getVideoSrc = useCallback(
+    (idx: number) => {
+      const step = PROTOCOL_DATA[idx];
+      return isDesktop ? step.videoDesktop : step.videoMobile;
+    },
+    [isDesktop]
+  );
 
   // Detect reduced-motion once
   const prefersReducedMotion =
@@ -251,6 +261,8 @@ export default function ProtocolSlider() {
 
       // ── Reduced-motion: salta GSAP Flip, swap istantaneo ───────────────
       if (prefersReducedMotion) {
+        performTransition(nextIndex);
+        setActiveIndex(nextIndex);
         return;
       }
 
@@ -327,6 +339,9 @@ export default function ProtocolSlider() {
           },
         });
       } else {
+        // Nessuna miniatura visibile (frecce o auto-advance):
+        // Mostra lo scudo istantaneamente come fullscreen, poi transiziona
+        performTransition(nextIndex);
       }
 
       // 4. Commit state → React re-render (testi, coda)
@@ -426,6 +441,24 @@ export default function ProtocolSlider() {
       role="region"
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
+      {/* ═══════════════════════════════════════════════════════════════════════
+       *  BACKGROUND VIDEO — Singolo <video> con accelerazione hardware.
+       *  Il src viene aggiornato a runtime, ma il video è sempre coperto
+       *  dallo scudo visivo durante il caricamento → zero black frame.
+       *
+       *  Attributi: muted, loop, playsInline, autoPlay.
+       *  Nessun filtro CSS direttamente sul video.
+       * ═══════════════════════════════════════════════════════════════════ */}
+      <div className="absolute inset-0 z-0">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full"
+          style={VIDEO_GPU_STYLES}
+        />
 
         {/* ── OVERLAY: effetti visivi separati dal video ───────────────────
          *  Gradiente, brightness, vignette vanno QUI — mai sul <video>.

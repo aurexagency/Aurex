@@ -16,7 +16,7 @@ export interface ProtocolStep {
 export const PROTOCOL_STEPS: ProtocolStep[] = [
   {
     number: '01',
-    title: 'Analisi di Posizionamento e Qualificazione',
+    title: 'Studio del Potenziale Cliente',
     hook: 'Scopri se il tuo brand ha i requisiti per scalare e dominare il mercato digitale.',
     slug: '01-analisi-posizionamento',
   },

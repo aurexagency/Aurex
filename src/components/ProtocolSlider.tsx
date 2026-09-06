@@ -64,27 +64,11 @@ export default function ProtocolSlider() {
   const [isPaused, setIsPaused]      = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [isDesktop, setIsDesktop] = useState(
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
   const activeStep = PROTOCOL_DATA[activeIndex];
 
-  /** Calcola il src video corretto per un dato indice */
-  const getVideoSrc = useCallback(
-    (idx: number) => {
-      const step = PROTOCOL_DATA[idx];
-      return isDesktop ? step.videoDesktop : step.videoMobile;
-    },
-    [isDesktop]
-  );
+  // Variabile derivata: la fase attiva ha un video disponibile?
+  // Usata per il rendering condizionale video / img-only.
+  const activeHasVideo = activeStep.videoUrl !== null;
 
   // Detect reduced-motion once
   const prefersReducedMotion =
@@ -110,12 +94,13 @@ export default function ProtocolSlider() {
   }, [activeIndex]);
 
   /* ══════════════════════════════════════════════════════════════════════════
-   * MOUNT: inizializza il video di background con il primo step
+   * MOUNT: inizializza il video di background con il primo step (se presente)
    * ════════════════════════════════════════════════════════════════════════ */
   useEffect(() => {
     const video = videoRef.current;
-    if (video) {
-      video.src = getVideoSrc(0);
+    const firstStep = PROTOCOL_DATA[0];
+    if (video && firstStep.videoUrl) {
+      video.src = firstStep.videoUrl;
       video.load();
       video.play().catch(() => {});
     }
@@ -197,51 +182,70 @@ export default function ProtocolSlider() {
         zIndex: 4, // sopra il video (z-0), sotto l'overlay testo (z-10)
       });
 
-      // ── 2. Sotto lo scudo: cambia src del video ─────────────────────────
-      const newSrc = getVideoSrc(nextIndex);
-      video.src = newSrc;
-      video.load();
+      // ── 2a. La prossima fase ha un video: carica e riproduci ────────────
+      if (nextStep.videoUrl) {
+        // Rendi il tag <video> visibile (potrebbe essere nascosto da una fase senza video)
+        gsap.set(video, { autoAlpha: 1 });
 
-      // ── 3. Sincronizzazione DOM nativa: attendi che il primo frame
-      //       sia decodificato prima di rivelare il video ──────────────────
-      const onCanPlay = () => {
-        video.removeEventListener('canplay', onCanPlay);
-        canplayCleanupRef.current = null;
+        video.src = nextStep.videoUrl;
+        video.load();
 
-        // Assicurati che il video stia effettivamente girando
-        video.play().catch(() => {});
+        // ── 3. Attendi canplay per un reveal senza black frame ──────────
+        const onCanPlay = () => {
+          video.removeEventListener('canplay', onCanPlay);
+          canplayCleanupRef.current = null;
 
-        // ── 4. THE REVEAL: sfuma lo scudo, mostrando il video sotto ──────
-        gsap.to(shield, {
-          opacity: 0,
-          duration: REVEAL_DUR,
-          ease: 'power2.inOut',
-          force3D: true,
-          onComplete: () => {
-            gsap.set(shield, { visibility: 'hidden' });
-            isAnimatingRef.current = false;
-          },
+          video.play().catch(() => {});
+
+          // ── 4. THE REVEAL: sfuma lo scudo, mostrando il video sotto ──
+          gsap.to(shield, {
+            opacity: 0,
+            duration: REVEAL_DUR,
+            ease: 'power2.inOut',
+            force3D: true,
+            onComplete: () => {
+              gsap.set(shield, { visibility: 'hidden' });
+              isAnimatingRef.current = false;
+            },
+          });
+        };
+
+        video.addEventListener('canplay', onCanPlay);
+        canplayCleanupRef.current = () => video.removeEventListener('canplay', onCanPlay);
+
+        // Fallback: se canplay non scatta entro 3s, forza il reveal
+        const fallbackTimer = gsap.delayedCall(3, () => {
+          if (canplayCleanupRef.current) {
+            onCanPlay();
+          }
         });
-      };
 
-      video.addEventListener('canplay', onCanPlay);
-      canplayCleanupRef.current = () => video.removeEventListener('canplay', onCanPlay);
+        const originalCleanup = canplayCleanupRef.current;
+        canplayCleanupRef.current = () => {
+          originalCleanup();
+          fallbackTimer.kill();
+        };
 
-      // Fallback: se canplay non scatta entro 3s (rete lenta), forza il reveal
-      const fallbackTimer = gsap.delayedCall(3, () => {
-        if (canplayCleanupRef.current) {
-          onCanPlay(); // forza il reveal
-        }
-      });
+      } else {
+        // ── 2b. La prossima fase NON ha video: ferma e nascondi il <video>
+        //       Mostra solo la coverImage (lo scudo) in modo stabile. ──────
+        video.pause();
+        // Svuota src per liberare risorse del decoder
+        video.removeAttribute('src');
+        video.load();
+        // Nascondi completamente il tag <video> — sotto lo scudo non serve
+        gsap.set(video, { autoAlpha: 0 });
 
-      // Pulisci il fallback se canplay scatta prima
-      const originalCleanup = canplayCleanupRef.current;
-      canplayCleanupRef.current = () => {
-        originalCleanup();
-        fallbackTimer.kill();
-      };
+        // Lo scudo rimane visibile (opacity 1) come sfondo permanente.
+        // Nessun listener canplay necessario.
+        // Dopo REVEAL_DUR lasciamo lo scudo visibile anziché sfumarlo.
+        gsap.delayedCall(REVEAL_DUR, () => {
+          // Lo scudo rimane, ma segniamo la transizione come completata.
+          isAnimatingRef.current = false;
+        });
+      }
     },
-    [getVideoSrc]
+    [] // nessuna dipendenza esterna necessaria (accede a ref e costanti)
   );
 
   /* ── Navigate ─────────────────────────────────────────────────────────── */
@@ -442,22 +446,34 @@ export default function ProtocolSlider() {
       aria-label="Protocollo Aurex — Slider delle 10 fasi"
     >
       {/* ═══════════════════════════════════════════════════════════════════════
-       *  BACKGROUND VIDEO — Singolo <video> con accelerazione hardware.
-       *  Il src viene aggiornato a runtime, ma il video è sempre coperto
-       *  dallo scudo visivo durante il caricamento → zero black frame.
+       *  BACKGROUND — Logica condizionale video / immagine statica.
        *
-       *  Attributi: muted, loop, playsInline, autoPlay.
+       *  Il tag <video> è sempre in DOM (necessario per la strategia
+       *  shield + GSAP Flip), ma viene nascosto con autoAlpha:0 quando
+       *  la fase attiva non ha un video (videoUrl === null).
+       *  In quel caso lo sfondo viene fornito dallo <shield> img rimasto
+       *  visibile (opacity:1) dalla transizione performTransition.
+       *
+       *  Attributi video: muted, loop, playsInline, autoPlay.
        *  Nessun filtro CSS direttamente sul video.
        * ═══════════════════════════════════════════════════════════════════ */}
       <div className="absolute inset-0 z-0">
+        {/* Elemento <video> — sempre in DOM, visibile solo se activeHasVideo */}
         <video
           ref={videoRef}
           autoPlay
           muted
           loop
           playsInline
+          preload="metadata"
           className="absolute inset-0 w-full h-full"
-          style={VIDEO_GPU_STYLES}
+          style={{
+            ...VIDEO_GPU_STYLES,
+            // Quando la fase non ha video, lo rendiamo invisibile.
+            // GSAP gestisce autoAlpha durante le transizioni.
+            opacity: activeHasVideo ? undefined : 0,
+            visibility: activeHasVideo ? undefined : 'hidden',
+          }}
         />
 
         {/* ── OVERLAY: effetti visivi separati dal video ───────────────────

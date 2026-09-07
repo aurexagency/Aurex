@@ -742,10 +742,8 @@ function App() {
   return (
     <div
       ref={appRef}
-      className="relative w-full min-h-screen text-brand-marble bg-brand-anthracite selection:bg-brand-gold selection:text-brand-black"
+      className="relative w-full min-h-screen text-brand-marble bg-brand-black selection:bg-brand-gold selection:text-brand-black"
     >
-      <div className="noise-overlay" />
-
       {/* FLOATING DOCK NAVIGATION */}
       <FloatingDock />
 
@@ -768,7 +766,7 @@ function App() {
               style={{ transformStyle: 'preserve-3d', willChange: 'transform, opacity' }}
               aria-hidden="true"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-brand-anthracite/30 to-brand-anthracite" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-brand-black/30 to-brand-black" />
           </div>
           <div className="relative z-10 flex flex-col items-center text-center px-4 mt-20">
             <div className="overflow-hidden pb-2">
@@ -904,7 +902,7 @@ function App() {
         </div>
 
         {/* F. Team */}
-        <section id="team" aria-labelledby="team-heading" className="py-32 px-6 lg:px-12 bg-brand-anthracite border-t border-brand-gold/10">
+        <section id="team" aria-labelledby="team-heading" className="py-32 px-6 lg:px-12 bg-brand-black border-t border-brand-gold/10">
           <div className="max-w-6xl mx-auto">
             <header className="text-center mb-20">
               <p className="text-sm font-mono uppercase tracking-[0.3em] text-brand-gold mb-6">Le Persone</p>

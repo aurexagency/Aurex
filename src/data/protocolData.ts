@@ -84,7 +84,7 @@ export const PROTOCOL_DATA: ProtocolStep[] = [
     id: 5,
     stepNumber: 'FASE 05',
     title: 'Copywriting Persuasivo e Sceneggiatura',
-    shortDescription: 'Trasformiamo il tuo know-how aziendale in script video ad alto tasso di conversione.',
+    shortDescription: 'Trasformiamo il tuo <span class="bg-[#D4AF37] text-[#000] px-1 rounded-sm font-semibold">know-how aziendale</span> \nin script video ad alto <span class="bg-[#D4AF37] text-[#000] px-1 rounded-sm font-semibold">tasso di conversione</span>.',
     fullDescription: 'Scriviamo le parole che vendono. Dai testi per le campagne agli script per i video aziendali, ogni parola è calibrata per risuonare con il tuo pubblico e spingerlo all\'azione.',
     sopDetails: [
       'Ricerca del tono di voce (ToV) ideale.',

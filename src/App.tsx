@@ -96,13 +96,13 @@ const setupCanvasSequence = (
     frame: frameCount - 1,
     snap: 'frame',
     ease: 'none',
-    scrollTrigger: {
-      trigger: triggerRef.current,
-      start: 'top top',
-      end: scrollEnd,
-      scrub: 0.5,
-      pin: true,
-    },
+      scrollTrigger: {
+        trigger: triggerRef.current,
+        start: 'top top',
+        end: scrollEnd,
+        scrub: 1.5,
+        pin: true,
+      },
     onUpdate: render,
   });
 
@@ -461,7 +461,7 @@ const founders: TeamMember[] = [
   {
     id: '01',
     name: 'Simone',
-    role: 'Co-Founder & Account Manager',
+    role: 'Co-Founder, Account Manager and Video/PhotoMaker',
     bio: `Visione cinematografica e strategia data-driven. Traduce l'identità di ogni brand in narrazioni che vendono prima ancora di parlare.`,
     photo: '/Team/Foto Profilo Simone2.jpeg',
     alt: 'Simone, Co-Founder & Account Manager — Aurex',
@@ -471,8 +471,8 @@ const founders: TeamMember[] = [
   {
     id: '02',
     name: 'GIGI',
-    role: 'Co- Founder & Strategy Manager e Ai Engineer',
-    bio: `Il team Aurex cresce con ogni collaborazione. Il prossimo a entrare nell'ecosistema potresti essere tu.`,
+    role: 'Co- Founder & Strategy Manager, Web Developer e Ai Engineer',
+    bio: `Analizza il contesto di business e struttura strategie di marketing su misura per ciascun cliente. Cura l'ideazione e lo sviluppo di siti web performanti, gestendo l'indicizzazione e l'ottimizzazione di ogni asset digitale per la specifica nicchia di riferimento, con un approccio integrato a SEO, SEM e GEO.`,
     photo: '/Team/Foto Profilo Luigi Cirianni.jpeg',
     alt: `Slot partner Aurex — entra nell'ecosistema`,
     isPartner: false,
@@ -483,7 +483,7 @@ const collaborators: TeamMember[] = [
   {
     id: '03',
     name: 'Alessio Ginanneschi',
-    role: 'Video/Foto Strategist',
+    role: 'Drone operator, VideoMaker',
     bio: `Descrizione del collaboratore e del suo ruolo nel team Aurex.`,
     photo: '/Team/Foto Profilo Alessio Ginanneschi.jpeg',
     alt: `Alessio Ginanneschi — Aurex`,
@@ -664,8 +664,8 @@ function App() {
         const cleanupHeroCanvas = setupCanvasSequence(
           canvasRef,
           heroRef,
-          155,
-          (index) => `/animazione_orizzontale/animazione orizzontale _${index.toString().padStart(3, '0')}.jpg`,
+          82,
+          (index) => `/frame-hero/Frame-hero_${index.toString().padStart(3, '0')}.webp`,
           '+=5000',
         );
 

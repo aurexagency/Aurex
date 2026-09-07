@@ -476,13 +476,24 @@ export default function ProtocolSlider() {
           }}
         />
 
-        {/* ── OVERLAY: effetti visivi separati dal video ───────────────────
-         *  Gradiente, brightness, vignette vanno QUI — mai sul <video>.
+        {/* ── OVERLAY MOBILE: gradiente verticale — protegge testo in alto, lascia trasparente il basso
+         *  ── OVERLAY DESKTOP: gradiente orizzontale — colonna sinistra scura, destra aperta
+         *  Doppio layer per coprire ogni condizione di sfondo chiaro (es. FASE 05)
          * ──────────────────────────────────────────────────────────────── */}
+
+        {/* Layer 1 — Mobile (< md): scrim verticale top-heavy */}
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-none md:hidden"
           style={{
-            background: 'linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.35) 100%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.75) 50%, rgba(0,0,0,0.30) 100%)',
+          }}
+        />
+
+        {/* Layer 2 — Desktop (≥ md): scrim orizzontale sinistra-destra */}
+        <div
+          className="absolute inset-0 pointer-events-none hidden md:block"
+          style={{
+            background: 'linear-gradient(to right, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 40%, rgba(0,0,0,0.20) 70%, transparent 100%)',
           }}
         />
       </div>
@@ -524,38 +535,43 @@ export default function ProtocolSlider() {
           className="flex flex-col items-start gap-3 max-w-xl
                      pt-4 md:pt-0 md:flex-1 md:justify-center md:pr-16 md:gap-0"
         >
-          {/* Eyebrow badge */}
+          {/* Eyebrow badge — sfondo scuro garantito + blur per massima leggibilità */}
           <span
             className="inline-flex items-center gap-2 w-fit text-[11px] uppercase tracking-[0.3em] font-mono
-                       text-[#D4AF37]/80 border border-[#D4AF37]/25 bg-[#080808]/60
+                       text-[#D4AF37] border border-[#D4AF37]/30 bg-black/60
                        px-4 py-1.5 rounded-sm backdrop-blur-md md:mb-8"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse" />
             {activeStep.stepNumber} // {TOTAL}
           </span>
 
-          {/* Title H2 */}
+          {/* Title H2 — drop-shadow profonda per staccarsi da qualsiasi sfondo chiaro */}
           <h2
             className="text-2xl font-bold md:text-5xl lg:text-6xl xl:text-7xl font-display
-                       tracking-tight text-white leading-[1.08] md:mb-6"
+                       tracking-tight text-white leading-[1.08] md:mb-6
+                       drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]"
             style={{ willChange: 'transform' }}
           >
             {activeStep.title}
           </h2>
 
-          {/* Tagline / Short Description */}
-          <p className="text-sm text-neutral-300 line-clamp-3
-                        md:line-clamp-none md:text-xl font-sans md:text-white/60 leading-relaxed max-w-xl md:mb-10">
-            {activeStep.shortDescription}
-          </p>
+          {/* Tagline / Short Description — neutral-100 + drop-shadow + whitespace-pre-line per andare a capo */}
+          <p 
+            className="text-sm text-neutral-100 line-clamp-3 whitespace-pre-line
+                       md:line-clamp-none md:text-xl font-sans leading-relaxed max-w-xl md:mb-10
+                       drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]"
+            dangerouslySetInnerHTML={{ __html: activeStep.shortDescription }}
+          />
 
-          {/* CTA — inline nel flusso, mt-2 su mobile, mt-0 su desktop (già spaziato da mb-10) */}
+          {/* CTA — shadow scura per staccarsi + glow oro su hover */}
           <button
             onClick={() => setIsModalOpen(true)}
             className="group inline-flex items-center gap-3 w-fit px-6 py-3 mt-2
                        md:px-8 md:py-4 md:mt-0
                        bg-[#D4AF37] text-[#000] font-mono text-xs md:text-sm uppercase tracking-[0.2em] font-bold
-                       hover:bg-[#F3E5AB] active:scale-[0.97] transition-all duration-200 rounded-sm"
+                       shadow-[0_4px_25px_rgba(0,0,0,0.8)]
+                       hover:bg-[#F3E5AB] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)]
+                       active:scale-[0.97] transition-all duration-200 rounded-sm"
           >
             Approfondisci SOP
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

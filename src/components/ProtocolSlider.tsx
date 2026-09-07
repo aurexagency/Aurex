@@ -437,7 +437,7 @@ export default function ProtocolSlider() {
   return (
     <section
       ref={containerRef}
-      className="relative w-full h-[100vh] min-h-[700px] bg-[#000] overflow-hidden"
+      className="relative w-full h-[100vh] h-[100dvh] min-h-[600px] md:min-h-[700px] bg-[#000] overflow-hidden"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onKeyDown={handleKey}
@@ -514,17 +514,21 @@ export default function ProtocolSlider() {
       />
 
       {/* ── MAIN LAYOUT: Content left + Queue right ──────────────────────── */}
-      <div className="relative z-10 h-full max-w-[1440px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row">
-        {/* LEFT — Text content */}
+      <div className="relative z-10 h-full max-w-[1440px] mx-auto
+                      flex flex-col justify-between pt-20 pb-4 px-4
+                      md:flex-row md:px-12 md:py-12">
+
+        {/* LEFT — Text content: grouped vertically, no absolute CTA */}
         <div
           ref={textBlockRef}
-          className="flex-1 flex flex-col justify-center py-32 md:py-0 pr-0 md:pr-16"
+          className="flex flex-col items-start gap-3 max-w-xl
+                     pt-4 md:pt-0 md:flex-1 md:justify-center md:pr-16 md:gap-0"
         >
           {/* Eyebrow badge */}
           <span
             className="inline-flex items-center gap-2 w-fit text-[11px] uppercase tracking-[0.3em] font-mono
                        text-[#D4AF37]/80 border border-[#D4AF37]/25 bg-[#080808]/60
-                       px-4 py-1.5 rounded-sm backdrop-blur-md mb-8"
+                       px-4 py-1.5 rounded-sm backdrop-blur-md md:mb-8"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-pulse" />
             {activeStep.stepNumber} // {TOTAL}
@@ -532,23 +536,25 @@ export default function ProtocolSlider() {
 
           {/* Title H2 */}
           <h2
-            className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold
-                       tracking-tight text-white leading-[1.08] mb-6"
+            className="text-2xl font-bold md:text-5xl lg:text-6xl xl:text-7xl font-display
+                       tracking-tight text-white leading-[1.08] md:mb-6"
             style={{ willChange: 'transform' }}
           >
             {activeStep.title}
           </h2>
 
           {/* Tagline / Short Description */}
-          <p className="text-lg md:text-xl font-sans text-white/60 leading-relaxed max-w-xl mb-10">
+          <p className="text-sm text-neutral-300 line-clamp-3
+                        md:line-clamp-none md:text-xl font-sans md:text-white/60 leading-relaxed max-w-xl md:mb-10">
             {activeStep.shortDescription}
           </p>
 
-          {/* CTA */}
+          {/* CTA — inline nel flusso, mt-2 su mobile, mt-0 su desktop (già spaziato da mb-10) */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="group inline-flex items-center gap-3 w-fit px-8 py-4
-                       bg-[#D4AF37] text-[#000] font-mono text-sm uppercase tracking-[0.2em] font-bold
+            className="group inline-flex items-center gap-3 w-fit px-6 py-3 mt-2
+                       md:px-8 md:py-4 md:mt-0
+                       bg-[#D4AF37] text-[#000] font-mono text-xs md:text-sm uppercase tracking-[0.2em] font-bold
                        hover:bg-[#F3E5AB] active:scale-[0.97] transition-all duration-200 rounded-sm"
           >
             Approfondisci SOP
@@ -556,7 +562,7 @@ export default function ProtocolSlider() {
           </button>
         </div>
 
-        {/* RIGHT — Queue: miniature 9:16 (max 4, bottom-aligned)
+        {/* RIGHT — Queue Desktop: miniature 9:16 (max 4, bottom-aligned)
          *  Spaziatura: gap-4 (16px = 2×8) e pb-24 (96px = 12×8) → griglia 8px */}
         <div
           className="hidden md:flex items-end gap-4 pb-24 shrink-0"
@@ -605,25 +611,33 @@ export default function ProtocolSlider() {
         </div>
       </div>
 
-      {/* ── MOBILE: horizontal scroll strip ──────────────────────────────── */}
-      <div className="md:hidden absolute bottom-24 left-0 right-0 z-20 px-4">
+      {/* ── MOBILE: Thumbnails strip — isolated, bottom-anchored ─────────── */}
+      <div
+        className="md:hidden relative z-20 w-full shrink-0 mt-auto pt-2 pb-2 px-4"
+      >
         <div
-          className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory
-                     scrollbar-thin scrollbar-thumb-[#D4AF37]/30 scrollbar-track-transparent"
+          className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory
+                     touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none]
+                     [&::-webkit-scrollbar]:hidden"
           role="tablist"
+          aria-label="Seleziona una fase del protocollo"
         >
           {PROTOCOL_DATA.map((step, idx) => {
             const isActive = idx === activeIndex;
             return (
               <button
                 key={step.id}
+                data-queue-thumb=""
+                data-queue-index={idx}
+                data-flip-id={`queue-mobile-${step.id}`}
                 onClick={() => goTo(idx)}
                 role="tab"
                 aria-selected={isActive}
-                className={`relative shrink-0 w-24 aspect-[9/16] rounded-sm overflow-hidden snap-start
+                aria-label={`Vai a: ${step.title}`}
+                className={`relative shrink-0 w-[72px] h-[128px] rounded-sm overflow-hidden snap-start
                            border transition-all duration-300 ${
                   isActive
-                    ? 'border-[#D4AF37]/60 shadow-[0_0_15px_rgba(212,175,55,0.2)]'
+                    ? 'border-[#D4AF37]/60 shadow-[0_0_12px_rgba(212,175,55,0.2)] scale-[1.03]'
                     : 'border-white/10 opacity-60'
                 }`}
               >
@@ -636,8 +650,8 @@ export default function ProtocolSlider() {
                   draggable={false}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent pointer-events-none" />
-                <div className="absolute bottom-2 left-2 right-2 text-left">
-                  <span className="block text-[9px] font-mono text-[#D4AF37] tracking-widest uppercase mb-0.5">
+                <div className="absolute bottom-1.5 left-1.5 right-1.5 text-left">
+                  <span className="block text-[8px] font-mono text-[#D4AF37] tracking-widest uppercase">
                     {step.stepNumber}
                   </span>
                 </div>
@@ -648,7 +662,8 @@ export default function ProtocolSlider() {
       </div>
 
       {/* ── BOTTOM BAR: Progress + Controls ──────────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 bg-[#000]/80 backdrop-blur-md border-t border-[#D4AF37]/15">
+      <div className="absolute bottom-0 left-0 right-0 z-30 bg-[#000]/80 backdrop-blur-md border-t border-[#D4AF37]/15"
+           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-6">
           {/* Step counter */}
           <span className="text-xs font-mono text-[#D4AF37]/60 tracking-[0.25em] whitespace-nowrap">
